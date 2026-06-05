@@ -80,7 +80,7 @@ export default function ForRetailersPage() {
   const productsInStockLabel = inStockProducts == null ? '...' : inStockProducts.toLocaleString('da-DK');
 
   return (
-    <div className="min-h-screen bg-white text-[hsl(222_47%_10%)]">
+    <div className="min-h-screen bg-[#f8f6f3] text-[hsl(222_47%_10%)]">
       <PageTopBar />
 
       <main className="mx-auto w-full max-w-[1180px] px-4 py-8">

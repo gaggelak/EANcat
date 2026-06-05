@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Filter, Menu, Search } from 'lucide-react';
@@ -7,6 +7,24 @@ import { Filter, Menu, Search } from 'lucide-react';
 export default function PageTopBar() {
   const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (menuRef.current && (!target || !menuRef.current.contains(target))) {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+    };
+  }, []);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -71,9 +89,49 @@ export default function PageTopBar() {
             >
               Login
             </a>
-            <button className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[hsl(220_16%_84%)] bg-white text-[hsl(222_47%_20%)]">
-              <Menu className="h-4 w-4" />
-            </button>
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[hsl(220_16%_84%)] bg-white text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
+                aria-label="Open menu"
+                title="Menu"
+              >
+                <Menu className="h-4 w-4" />
+              </button>
+
+              {menuOpen && (
+                <div className="absolute right-0 top-11 z-50 w-[296px] rounded-xl border border-[hsl(220_16%_84%)] bg-white p-4 shadow-[0_12px_30px_rgb(18_32_74/0.18)]">
+                  <div className="space-y-4 text-[13px] text-[hsl(222_47%_18%)]">
+                    <section>
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Explore</p>
+                      <div className="flex flex-col gap-1 text-[13px] leading-6">
+                        <Link to="/for-retailers" className="hover:underline" onClick={() => setMenuOpen(false)}>For Retailers</Link>
+                        <Link to="/for-distributors" className="hover:underline" onClick={() => setMenuOpen(false)}>For Distributors</Link>
+                        <Link to="/about-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Our story</Link>
+                        <Link to="/about-us" className="hover:underline" onClick={() => setMenuOpen(false)}>How it works</Link>
+                        <Link to="/work-with-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Work with us</Link>
+                        <Link to="/blog" className="hover:underline" onClick={() => setMenuOpen(false)}>Blog</Link>
+                      </div>
+                    </section>
+
+                    <section className="border-t border-[hsl(220_14%_90%)] pt-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Company</p>
+                      <div className="flex flex-col gap-0.5 text-[13px] leading-6 text-[hsl(220_14%_36%)]">
+                        <p>EANrunner by Etaility AB</p>
+                        <p>VAT SE559006389601</p>
+                        <a href="mailto:info@eanrunner.com" className="font-medium text-[hsl(221_92%_42%)] hover:underline">info@eanrunner.com</a>
+                      </div>
+                    </section>
+
+                    <section className="border-t border-[hsl(220_14%_90%)] pt-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Follow</p>
+                      <a href="https://www.linkedin.com/company/eanrunner" target="_blank" rel="noreferrer" className="text-[13px] leading-6 hover:underline">LinkedIn</a>
+                    </section>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

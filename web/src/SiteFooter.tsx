@@ -32,7 +32,7 @@ export default function SiteFooter({ className = 'mt-10' }: SiteFooterProps) {
             <Link to="/about-us" className="text-[hsl(221_92%_42%)] hover:underline">Our story</Link>
             <Link to="/about-us" className="text-[hsl(221_92%_42%)] hover:underline">How it works</Link>
             <Link to="/work-with-us" className="text-[hsl(221_92%_42%)] hover:underline">Work with us</Link>
-            <a href="https://www.eanrunner.com" target="_blank" rel="noreferrer" className="text-[hsl(221_92%_42%)] hover:underline">Blog (company posts and updates)</a>
+            <Link to="/blog" className="text-[hsl(221_92%_42%)] hover:underline">Blog (company posts and updates)</Link>
           </div>
         </section>
 

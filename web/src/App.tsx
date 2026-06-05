@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ExternalLink, Filter, Loader2, Menu, Search, X } from 'lucide-react';
 import { getBrandClusters, getCategories, getProducts, getSearchSuggestions } from './api';
@@ -13,6 +13,7 @@ const BRAND_PAGE_BATCH_SIZE = 120;
 const BRAND_CLUSTER_MIN_PRODUCTS = 9;
 const BRAND_CLUSTER_BRAND_BATCH = 10;
 const BRAND_CLUSTER_REQUEST_TIMEOUT_MS = 7000;
+const ABOVE_THE_FOLD_PRIORITY_COUNT = 8;
 const FILTER_OPTIONS_CACHE_KEY = 'webversion.filter-options.cache.v2';
 const FILTER_OPTIONS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const URL_ALLOWED_GRADES = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'N/A']);
@@ -224,12 +225,14 @@ function marginRangeLabel(grade: string, marketPrice: number | null, currency: s
   }
 }
 
-function ProductCard({
+const ProductCard = memo(function ProductCard({
   product,
   compact,
+  eagerImage,
 }: {
   product: PublicProduct;
   compact?: boolean;
+  eagerImage?: boolean;
 }) {
   const grade = GRADE_STYLES[product.marginGrade] ?? GRADE_STYLES['N/A'];
   const rangeLabel = marginRangeLabel(product.marginGrade, product.marketPrice, product.marketCurrency);
@@ -238,13 +241,20 @@ function ProductCard({
   const compactClass = compact ? 'rounded-lg' : 'rounded-xl';
 
   return (
-    <div className={`bg-white ${compactClass} border border-[hsl(220_14%_89%)] shadow-[0_1px_3px_0_rgb(0_0_0/0.06)] overflow-hidden flex flex-col hover:shadow-md transition-shadow`}>
+    <div
+      className={`bg-white ${compactClass} border border-[hsl(220_14%_89%)] shadow-[0_1px_3px_0_rgb(0_0_0/0.06)] overflow-hidden flex flex-col hover:shadow-md transition-shadow`}
+      style={{
+        contentVisibility: 'auto',
+        containIntrinsicSize: compact ? '330px 180px' : '360px 220px',
+      }}
+    >
       <Link to={`/product/${encodeURIComponent(product.ean)}`} className="block">
         <div className={`aspect-square bg-white overflow-hidden relative ${compact ? 'max-h-[180px]' : ''}`}>
           <img
             src={product.image || PLACEHOLDER_IMAGE}
             alt={product.title}
-            loading="lazy"
+            loading={eagerImage ? 'eager' : 'lazy'}
+            fetchPriority={eagerImage ? 'high' : 'auto'}
             decoding="async"
             className={`w-full h-full object-contain ${compact ? 'p-2.5' : 'p-3'}`}
             onError={(e) => {
@@ -314,7 +324,7 @@ function ProductCard({
       </div>
     </div>
   );
-}
+});
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
@@ -380,6 +390,7 @@ function App() {
   const hasMultiFilterSelection = selectedCategoryValues.length > 1 || selectedBrandValues.length > 1;
   const defaultListPageSize = hasMultiFilterSelection ? MULTI_FILTER_PAGE_SIZE : PAGE_SIZE;
   const shouldUseCompactPreviewPageSize = isCompactVersion
+    && viewMode === 'grid'
     && selectedCategoryValues.length === 0
     && selectedBrandValues.length === 0
     && !debouncedKeyword.trim()
@@ -1216,35 +1227,32 @@ function App() {
                     </button>
 
                     {menuOpen && (
-                      <div className="absolute right-0 top-11 z-50 w-[280px] rounded-xl border border-[hsl(220_16%_84%)] bg-white p-3 shadow-[0_12px_30px_rgb(18_32_74/0.18)]">
-                        <div className="space-y-3 text-[12px] text-[hsl(222_47%_18%)]">
+                      <div className="absolute right-0 top-11 z-50 w-[296px] rounded-xl border border-[hsl(220_16%_84%)] bg-white p-4 shadow-[0_12px_30px_rgb(18_32_74/0.18)]">
+                        <div className="space-y-4 text-[13px] text-[hsl(222_47%_18%)]">
                           <section>
-                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_46%)]">Explore</p>
-                            <div className="flex flex-col gap-1">
+                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Explore</p>
+                            <div className="flex flex-col gap-1 text-[13px] leading-6">
                               <Link to="/for-retailers" className="hover:underline" onClick={() => setMenuOpen(false)}>For Retailers</Link>
                               <Link to="/for-distributors" className="hover:underline" onClick={() => setMenuOpen(false)}>For Distributors</Link>
                               <Link to="/about-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Our story</Link>
                               <Link to="/about-us" className="hover:underline" onClick={() => setMenuOpen(false)}>How it works</Link>
                               <Link to="/work-with-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Work with us</Link>
-                              <a href="https://www.eanrunner.com" target="_blank" rel="noreferrer" className="hover:underline">Blog</a>
+                              <Link to="/blog" className="hover:underline" onClick={() => setMenuOpen(false)}>Blog</Link>
                             </div>
                           </section>
 
-                          <section className="border-t border-[hsl(220_14%_90%)] pt-2">
-                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_46%)]">Company</p>
-                            <p className="text-[11px] text-[hsl(220_14%_36%)]">EANrunner by Etaility AB</p>
-                            <p className="text-[11px] text-[hsl(220_14%_36%)]">VAT SE559006389601</p>
-                            <a href="mailto:info@eanrunner.com" className="text-[11px] text-[hsl(221_92%_42%)] hover:underline">info@eanrunner.com</a>
+                          <section className="border-t border-[hsl(220_14%_90%)] pt-3">
+                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Company</p>
+                            <div className="flex flex-col gap-0.5 text-[13px] leading-6 text-[hsl(220_14%_36%)]">
+                              <p>EANrunner by Etaility AB</p>
+                              <p>VAT SE559006389601</p>
+                              <a href="mailto:info@eanrunner.com" className="font-medium text-[hsl(221_92%_42%)] hover:underline">info@eanrunner.com</a>
+                            </div>
                           </section>
 
-                          <section className="border-t border-[hsl(220_14%_90%)] pt-2">
-                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_46%)]">Follow</p>
-                            <a href="https://www.linkedin.com/company/eanrunner" target="_blank" rel="noreferrer" className="hover:underline">LinkedIn</a>
-                          </section>
-
-                          <section className="border-t border-[hsl(220_14%_90%)] pt-2">
-                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_46%)]">Integrations</p>
-                            <p className="text-[11px] text-[hsl(220_14%_36%)]">Shopify · WooCommerce · Quickbutik · Magento · BigQuery</p>
+                          <section className="border-t border-[hsl(220_14%_90%)] pt-3">
+                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Follow</p>
+                            <a href="https://www.linkedin.com/company/eanrunner" target="_blank" rel="noreferrer" className="text-[13px] leading-6 hover:underline">LinkedIn</a>
                           </section>
                         </div>
                       </div>
@@ -1545,11 +1553,12 @@ function App() {
                       className="grid gap-2"
                       style={{ gridTemplateColumns: `repeat(${compactBrandPreviewCount}, minmax(0, 1fr))` }}
                     >
-                      {group.items.slice(0, previewLimit).map((product) => (
+                      {group.items.slice(0, previewLimit).map((product, index) => (
                         <ProductCard
                           key={product.ean}
                           product={product}
                           compact
+                          eagerImage={groupIndex === 0 && index < ABOVE_THE_FOLD_PRIORITY_COUNT}
                         />
                       ))}
                       {showIntroTile && (
@@ -1680,11 +1689,12 @@ function App() {
 
                 {viewMode === 'grid' ? (
                   <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
-                    {visibleProducts.map((product) => (
+                    {visibleProducts.map((product, index) => (
                       <ProductCard
                         key={product.ean}
                         product={product}
                         compact
+                        eagerImage={index < ABOVE_THE_FOLD_PRIORITY_COUNT}
                       />
                     ))}
                   </div>

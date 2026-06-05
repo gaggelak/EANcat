@@ -7,7 +7,7 @@ export default function ForDistributorsPage() {
   const ctaHref = '/get-approved';
 
   return (
-    <div className="min-h-screen bg-white text-[hsl(222_47%_10%)]">
+    <div className="min-h-screen bg-[#f8f6f3] text-[hsl(222_47%_10%)]">
       <PageTopBar />
 
       <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:py-8">
