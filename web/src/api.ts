@@ -4,6 +4,8 @@ import type {
   CategoriesResponse,
   ProductDetailResponse,
   ProductListResponse,
+  SearchSuggestionType,
+  SearchSuggestResponse,
 } from './types';
 
 // Azure Container App (eancat-api) — reads the isolated showcase_product DB.
@@ -92,4 +94,18 @@ export function getCatalogStats(): Promise<CatalogStatsResponse> {
 export function getProductByEan(ean: string, market = 'dk'): Promise<ProductDetailResponse> {
   const params = new URLSearchParams({ market });
   return readJson<ProductDetailResponse>(`/api/public/products/${encodeURIComponent(ean)}?${params.toString()}`);
+}
+
+export function getSearchSuggestions(
+  query: string,
+  options?: { market?: string; inStock?: boolean; hasImage?: boolean; limit?: number; types?: SearchSuggestionType[] },
+): Promise<SearchSuggestResponse> {
+  const params = new URLSearchParams();
+  params.set('q', query);
+  if (options?.market) params.set('market', options.market);
+  if (options?.inStock) params.set('inStock', 'true');
+  if (options?.hasImage) params.set('hasImage', 'true');
+  if (options?.limit && options.limit > 0) params.set('limit', String(options.limit));
+  if (options?.types && options.types.length > 0) params.set('types', options.types.join(','));
+  return readJson<SearchSuggestResponse>(`/api/public/suggest?${params.toString()}`);
 }

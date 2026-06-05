@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Building2, Mail, Network, PlugZap, ShieldCheck } from 'lucide-react';
+import PageTopBar from './PageTopBar';
+import SiteFooter from './SiteFooter';
 
 export default function AboutUsPage() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,hsl(210_40%_98%),hsl(220_22%_96%))] text-[hsl(222_47%_12%)]">
+      <PageTopBar />
       <div className="mx-auto max-w-6xl px-4 py-8 md:py-12">
         <Link
           to="/"
@@ -106,6 +109,8 @@ export default function AboutUsPage() {
             EANrunner is designed for companies that want expansion to feel operational, not technical. The goal is simple: make supplier data usable, make integrations repeatable, and remove the manual bottlenecks that slow down growth.
           </p>
         </section>
+
+        <SiteFooter className="mt-10" />
       </div>
     </div>
   );

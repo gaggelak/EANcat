@@ -1,17 +1,19 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ExternalLink, Filter, Loader2, Search, X } from 'lucide-react';
-import { getBrandClusters, getCategories, getProducts } from './api';
-import type { BrandClusterGroup, CategoryEntry, PublicProduct } from './types';
+import { ExternalLink, Filter, Loader2, Menu, Search, X } from 'lucide-react';
+import { getBrandClusters, getCategories, getProducts, getSearchSuggestions } from './api';
+import type { BrandClusterGroup, CategoryEntry, PublicProduct, SearchSuggestion } from './types';
+import SiteFooter from './SiteFooter';
 
 const PAGE_SIZE = 48;
 const MULTI_FILTER_PAGE_SIZE = 200;
+const LIST_LOAD_MORE_BATCH_SIZE = 98;
 const BRAND_PAGE_INITIAL_BATCH_SIZE = 60;
 const BRAND_PAGE_BATCH_SIZE = 120;
 const BRAND_CLUSTER_MIN_PRODUCTS = 9;
 const BRAND_CLUSTER_BRAND_BATCH = 10;
 const BRAND_CLUSTER_REQUEST_TIMEOUT_MS = 7000;
-const FILTER_OPTIONS_CACHE_KEY = 'webversion.filter-options.cache';
+const FILTER_OPTIONS_CACHE_KEY = 'webversion.filter-options.cache.v2';
 const FILTER_OPTIONS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const URL_ALLOWED_GRADES = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'N/A']);
 
@@ -67,16 +69,16 @@ const COMPETITION_LEVEL_LABELS: Record<0 | 1 | 2 | 3, string> = {
   3: 'High competition',
 };
 
-function competitionBadge(level: 0 | 1 | 2 | 3): { label: string; chiliColor: string; chip: string } {
+function competitionBadge(level: 0 | 1 | 2 | 3): { label: string; chiliColor: string; chiliCount: number } {
   switch (level) {
     case 0:
-      return { label: 'No competition', chiliColor: 'text-emerald-600', chip: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      return { label: 'No competition', chiliColor: 'text-emerald-600', chiliCount: 1 };
     case 1:
-      return { label: 'Low competition', chiliColor: 'text-lime-600', chip: 'bg-lime-50 text-lime-700 border-lime-200' };
+      return { label: 'Low competition', chiliColor: 'text-red-600', chiliCount: 1 };
     case 2:
-      return { label: 'Medium competition', chiliColor: 'text-amber-500', chip: 'bg-amber-50 text-amber-700 border-amber-200' };
+      return { label: 'Medium competition', chiliColor: 'text-red-600', chiliCount: 2 };
     default:
-      return { label: 'High competition', chiliColor: 'text-red-600', chip: 'bg-red-50 text-red-700 border-red-200' };
+      return { label: 'High competition', chiliColor: 'text-red-600', chiliCount: 3 };
   }
 }
 
@@ -242,8 +244,6 @@ function ProductCard({
           <img
             src={product.image || PLACEHOLDER_IMAGE}
             alt={product.title}
-            width={400}
-            height={400}
             loading="lazy"
             decoding="async"
             className={`w-full h-full object-contain ${compact ? 'p-2.5' : 'p-3'}`}
@@ -255,6 +255,24 @@ function ProductCard({
           <span className={`absolute ${compact ? 'top-1.5 right-1.5' : 'top-2 right-2'} text-[10px] font-bold px-1.5 py-0.5 rounded ${grade.bg} ${grade.text}`}>
             {product.marginGrade}
           </span>
+          <div className={`absolute ${compact ? 'top-1.5 left-1.5' : 'top-2 left-2'} inline-flex items-center gap-1`}>
+            <span
+              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-[hsl(220_16%_84%)] bg-white/95 px-1"
+              title={product.stockStatus === 'in stock' ? 'In stock' : 'Out of stock'}
+            >
+              {product.stockStatus === 'in stock' ? (
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              ) : (
+                <span className="text-[11px] leading-none text-red-600">🏭</span>
+              )}
+            </span>
+            <span
+              className="inline-flex h-5 items-center justify-center rounded-full border border-[hsl(220_16%_84%)] bg-white/95 px-1.5"
+              title={hot.label}
+            >
+              <span className={`text-[10px] leading-none ${hot.chiliColor}`}>{'🌶'.repeat(hot.chiliCount)}</span>
+            </span>
+          </div>
         </div>
       </Link>
       <div className={`${compact ? 'p-2.5 gap-1.5' : 'p-3 gap-2'} flex flex-col flex-1`}>
@@ -269,20 +287,6 @@ function ProductCard({
           >
             <span className="mr-1 shrink-0 text-[hsl(220_12%_52%)]">EAN:</span>
             <span className="break-all">{product.ean}</span>
-          </span>
-        </div>
-        <div className={`flex flex-wrap items-center ${compact ? 'gap-1' : 'gap-1.5'} text-[10px]`}>
-          <span className={`inline-flex items-center gap-1 whitespace-nowrap px-1.5 py-0.5 rounded-full font-medium ${
-            product.stockStatus === 'in stock'
-              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-              : 'bg-gray-100 text-gray-500 border border-gray-200'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${product.stockStatus === 'in stock' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-            {product.stockStatus === 'in stock' ? 'In stock' : 'Out of stock'}
-          </span>
-          <span className={`inline-flex max-w-full items-center gap-1 whitespace-nowrap px-1.5 py-0.5 rounded-full border font-medium ${hot.chip}`}>
-            <span className={`leading-none ${hot.chiliColor}`}>🌶</span>
-            <span className="truncate">{hot.label}</span>
           </span>
         </div>
         <p className={`${compact ? 'text-[8px]' : 'text-[9px]'} text-[hsl(220_12%_45%)] font-medium whitespace-nowrap overflow-hidden text-ellipsis`}>
@@ -330,6 +334,10 @@ function App() {
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1280 : window.innerWidth));
   const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedBrand, setSelectedBrand] = useState(decodedRouteBrand);
   const [inStockOnly, setInStockOnly] = useState(isCompactVersion);
@@ -340,21 +348,31 @@ function App() {
   const [brandSearchTerm, setBrandSearchTerm] = useState('');
   const [market, setMarket] = useState('dk');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
+  const [listVisibleLimit, setListVisibleLimit] = useState(PAGE_SIZE);
   const [brandVisibleLimit, setBrandVisibleLimit] = useState(BRAND_PAGE_INITIAL_BATCH_SIZE);
   const [brandClusterGroups, setBrandClusterGroups] = useState<BrandClusterGroup[]>([]);
   const [brandClusterOffset, setBrandClusterOffset] = useState(0);
   const [brandClusterTotalBrands, setBrandClusterTotalBrands] = useState(0);
   const [disableBrandClusters, setDisableBrandClusters] = useState(false);
+  const [showIntroCard, setShowIntroCard] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [hasLoadedTotalProducts, setHasLoadedTotalProducts] = useState(false);
   const [categories, setCategories] = useState<CategoryEntry[]>([]);
   const [brandsByCategory, setBrandsByCategory] = useState<Record<string, string[]>>({});
   const preBrandFilterStateRef = useRef<{ inStockOnly: boolean; hasPictureOnly: boolean } | null>(null);
   const hasHydratedFiltersFromUrlRef = useRef(false);
   const skipNextUrlWriteRef = useRef(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const searchBoxRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const latestSuggestRequestRef = useRef(0);
+  const suppressNextSuggestRef = useRef(false);
   const selectedCategoryValues = useMemo(() => splitFilterValues(selectedCategory), [selectedCategory]);
   const selectedBrandValues = useMemo(() => splitFilterValues(selectedBrand), [selectedBrand]);
 
@@ -373,6 +391,7 @@ function App() {
   const pageSize = shouldUseCompactPreviewPageSize ? compactPreviewPageSize : defaultListPageSize;
   const compactBrandPreviewCount = getCompactBrandPreviewCountForWidth(viewportWidth);
   const shouldClusterByBrand = isCompactVersion
+    && viewMode === 'grid'
     && selectedCategoryValues.length === 0
     && selectedBrandValues.length === 0
     && !debouncedKeyword.trim()
@@ -422,6 +441,7 @@ function App() {
     setPage(1);
     setBrandVisibleLimit(BRAND_PAGE_INITIAL_BATCH_SIZE);
     setBrandClusterOffset(0);
+    setShowIntroCard(true);
     setFiltersOpen(false);
   };
 
@@ -434,6 +454,25 @@ function App() {
       setBrandVisibleLimit(BRAND_PAGE_INITIAL_BATCH_SIZE);
     }
   }, [decodedRouteBrand]);
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (menuRef.current && (!target || !menuRef.current.contains(target))) {
+        setMenuOpen(false);
+      }
+      if (searchBoxRef.current && (!target || !searchBoxRef.current.contains(target))) {
+        setSuggestionsOpen(false);
+        setActiveSuggestionIndex(-1);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+    };
+  }, []);
 
   useEffect(() => {
     skipNextUrlWriteRef.current = true;
@@ -594,6 +633,7 @@ function App() {
             setBrandClusterGroups((prev) => (brandClusterOffset === 0 ? clusterData.brands : [...prev, ...clusterData.brands]));
             setBrandClusterTotalBrands(clusterData.totalBrands);
             setTotalProducts(clusterData.totalProducts);
+            setHasLoadedTotalProducts(true);
             setProducts([]);
             return;
           } catch (clusterErr) {
@@ -606,8 +646,10 @@ function App() {
         }
 
         const brandPageMode = isCompactVersion && !!decodedRouteBrand.trim();
-        const effectiveLimit = brandPageMode ? Math.max(brandVisibleLimit, BRAND_PAGE_INITIAL_BATCH_SIZE) : pageSize;
-        const effectivePage = normalizedKeyword || brandPageMode ? 1 : page;
+        const effectiveLimit = brandPageMode
+          ? Math.max(brandVisibleLimit, BRAND_PAGE_INITIAL_BATCH_SIZE)
+          : Math.max(listVisibleLimit, pageSize);
+        const effectivePage = 1;
         const selectedCategoryFilter = selectedCategoryValues.length > 0 ? joinFilterValues(selectedCategoryValues) : undefined;
         const selectedBrandFilter = selectedBrandValues.length > 0 ? joinFilterValues(selectedBrandValues) : undefined;
         const data = await getProducts(
@@ -626,6 +668,7 @@ function App() {
         if (!active) return;
         setProducts(data.products);
         setTotalProducts(backendTotal);
+        setHasLoadedTotalProducts(true);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : 'Could not load products');
@@ -652,6 +695,7 @@ function App() {
     disableBrandClusters,
     isCompactVersion,
     brandVisibleLimit,
+    listVisibleLimit,
     shouldClusterByBrand,
     pageSize,
     compactBrandPreviewCount,
@@ -660,6 +704,7 @@ function App() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
+    setListVisibleLimit(pageSize);
     setBrandClusterOffset(0);
     setBrandClusterGroups([]);
   }, [
@@ -671,6 +716,7 @@ function App() {
     inStockOnly,
     hasPictureOnly,
     selectedCompetitionLevels,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -687,7 +733,7 @@ function App() {
 
     return [...filtered]
       .sort((a, b) => {
-      if (isCompactVersion && decodedRouteBrand.trim()) {
+      if (decodedRouteBrand.trim() || selectedBrandValues.length > 0) {
         const aHasImage = a.image ? 1 : 0;
         const bHasImage = b.image ? 1 : 0;
         if (aHasImage !== bHasImage) return bHasImage - aHasImage;
@@ -697,8 +743,8 @@ function App() {
       const bNa = b.marginGrade === 'N/A' ? 1 : 0;
       return aNa - bNa;
       })
-        .slice(0, (isCompactVersion && decodedRouteBrand.trim()) ? brandVisibleLimit : pageSize);
-      }, [products, selectedCompetitionLevels, debouncedKeyword, isCompactVersion, decodedRouteBrand, brandVisibleLimit, pageSize]);
+        .slice(0, (isCompactVersion && decodedRouteBrand.trim()) ? brandVisibleLimit : listVisibleLimit);
+      }, [products, selectedCompetitionLevels, debouncedKeyword, isCompactVersion, decodedRouteBrand, selectedBrandValues, brandVisibleLimit, listVisibleLimit]);
 
   const brandGroups = useMemo(() => brandClusterGroups, [brandClusterGroups]);
 
@@ -720,9 +766,13 @@ function App() {
   }, [sortedCategories, brandsByCategory, selectedBrandValues]);
 
   const availableBrandOptions = useMemo(() => {
+    if (selectedCategoryValues.length === 0) {
+      return getUniqueBrandLabels(Object.values(brandsByCategory).flat());
+    }
+
     const categoriesToUse = selectedCategoryValues.length > 0
       ? selectedCategoryValues
-      : availableCategoryOptions.map((item) => item.name);
+      : sortedCategories.map((item) => item.name);
 
     const brandsToMerge: string[] = [];
     for (const categoryName of categoriesToUse) {
@@ -732,7 +782,7 @@ function App() {
     }
 
     return getUniqueBrandLabels(brandsToMerge);
-  }, [brandsByCategory, selectedCategoryValues, availableCategoryOptions]);
+  }, [brandsByCategory, selectedCategoryValues, sortedCategories]);
 
   const allBrandTagOptions = useMemo(() => {
     return getUniqueBrandLabels(Object.values(brandsByCategory).flat());
@@ -826,6 +876,168 @@ function App() {
     return chips;
   }, [selectedBrandValues, selectedCategoryValues, keyword, market, inStockOnly, hasPictureOnly, selectedGrades, selectedCompetitionLevels]);
 
+  const searchPlaceholder = hasLoadedTotalProducts
+    ? `Search EAN, Title, MPN of ${totalProducts.toLocaleString()} products`
+    : 'Search EAN, Title, MPN';
+
+  useEffect(() => {
+    const inputFocused = typeof document !== 'undefined' && document.activeElement === searchInputRef.current;
+    if (!inputFocused) {
+      setSuggestionsOpen(false);
+      setSuggestionsLoading(false);
+      return;
+    }
+
+    if (suppressNextSuggestRef.current) {
+      suppressNextSuggestRef.current = false;
+      return;
+    }
+
+    const query = keyword.trim();
+    if (query.length < 2) {
+      setSearchSuggestions([]);
+      setSuggestionsLoading(false);
+      setSuggestionsOpen(false);
+      setActiveSuggestionIndex(-1);
+      return;
+    }
+
+    const queryLower = query.toLowerCase();
+    const localBrandStartsWith = availableBrandOptions
+      .filter((brand) => brand.toLowerCase().startsWith(queryLower))
+      .slice(0, 4)
+      .map((brand) => ({ type: 'brand' as const, value: brand, label: brand, hitCount: 0 }));
+    const localCategoryStartsWith = availableCategoryOptions
+      .map((item) => item.name)
+      .filter((category) => category.toLowerCase().startsWith(queryLower))
+      .slice(0, 3)
+      .map((category) => ({ type: 'category' as const, value: category, label: category, hitCount: 0 }));
+
+    const localKeywordStartsWith = products
+      .map((product) => product.title)
+      .filter((title): title is string => Boolean(title && title.trim()))
+      .filter((title) => title.toLowerCase().startsWith(queryLower))
+      .filter((title, index, all) => all.findIndex((item) => item.toLowerCase() === title.toLowerCase()) === index)
+      .slice(0, 3)
+      .map((title) => ({ type: 'keyword' as const, value: title, label: title, hitCount: 0 }));
+
+    const localEanStartsWith = products
+      .map((product) => product.ean)
+      .filter((ean) => ean.toLowerCase().startsWith(queryLower))
+      .filter((ean, index, all) => all.indexOf(ean) === index)
+      .slice(0, 2)
+      .map((ean) => ({ type: 'ean' as const, value: ean, label: ean, hitCount: 0 }));
+
+    const localSuggestionsSeed: SearchSuggestion[] = [
+      { type: 'keyword', value: query, label: query, hitCount: 0 },
+      ...localBrandStartsWith,
+      ...localCategoryStartsWith,
+      ...localKeywordStartsWith,
+      ...localEanStartsWith,
+    ];
+
+    const seenLocal = new Set<string>();
+    const localSuggestions: SearchSuggestion[] = [];
+    for (const item of localSuggestionsSeed) {
+      const key = `${item.type}:${item.value.toUpperCase()}`;
+      if (seenLocal.has(key)) continue;
+      seenLocal.add(key);
+      localSuggestions.push(item);
+      if (localSuggestions.length >= 8) break;
+    }
+
+    setSearchSuggestions(localSuggestions);
+    setSuggestionsOpen(true);
+    setActiveSuggestionIndex(localSuggestions.length > 0 ? 0 : -1);
+
+    const requestId = latestSuggestRequestRef.current + 1;
+    latestSuggestRequestRef.current = requestId;
+    setSuggestionsLoading(true);
+
+    const timer = setTimeout(() => {
+      const mergeSuggestions = (base: SearchSuggestion[], incoming: SearchSuggestion[], cap: number) => {
+        const seen = new Set(base.map((item) => `${item.type}:${item.value.toUpperCase()}`));
+        return [
+          ...base,
+          ...incoming.filter((item) => {
+            const key = `${item.type}:${item.value.toUpperCase()}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          }),
+        ].slice(0, cap);
+      };
+
+      getSearchSuggestions(query, {
+        market,
+        inStock: inStockOnly,
+        hasImage: hasPictureOnly,
+        limit: 8,
+        types: ['brand', 'category'],
+      })
+        .then((firstPass) => {
+          if (latestSuggestRequestRef.current !== requestId) return;
+          const firstMerged = mergeSuggestions(localSuggestions, firstPass.suggestions, 10);
+          setSearchSuggestions(firstMerged);
+          setSuggestionsOpen(firstMerged.length > 0);
+          setActiveSuggestionIndex(firstMerged.length > 0 ? 0 : -1);
+          setSuggestionsLoading(false);
+
+          void getSearchSuggestions(query, {
+            market,
+            inStock: inStockOnly,
+            hasImage: hasPictureOnly,
+            limit: 8,
+            types: ['keyword', 'ean'],
+          })
+            .then((secondPass) => {
+              if (latestSuggestRequestRef.current !== requestId) return;
+              const secondMerged = mergeSuggestions(firstMerged, secondPass.suggestions, 12);
+              setSearchSuggestions(secondMerged);
+              setSuggestionsOpen(secondMerged.length > 0);
+              setActiveSuggestionIndex((prev) => (prev >= 0 ? prev : secondMerged.length > 0 ? 0 : -1));
+            })
+            .catch(() => {
+              // Keep first-pass suggestions if second pass fails.
+            });
+        })
+        .catch(() => {
+          if (latestSuggestRequestRef.current !== requestId) return;
+          setSearchSuggestions(localSuggestions);
+          setSuggestionsOpen(localSuggestions.length > 0);
+          setActiveSuggestionIndex(localSuggestions.length > 0 ? 0 : -1);
+          setSuggestionsLoading(false);
+        });
+    }, 60);
+
+    return () => clearTimeout(timer);
+  }, [keyword, market, inStockOnly, hasPictureOnly, availableBrandOptions, availableCategoryOptions, products]);
+
+  const applySuggestion = (suggestion: SearchSuggestion) => {
+    suppressNextSuggestRef.current = true;
+    if (suggestion.type === 'brand') {
+      setSelectedBrand(joinFilterValues([...selectedBrandValues, suggestion.value]));
+      setKeyword('');
+    } else if (suggestion.type === 'category') {
+      setSelectedCategory(joinFilterValues([...selectedCategoryValues, suggestion.value]));
+      setKeyword('');
+    } else {
+      setKeyword(suggestion.value);
+    }
+    setSearchSuggestions([]);
+    setSuggestionsOpen(false);
+    setSuggestionsLoading(false);
+    setActiveSuggestionIndex(-1);
+    searchInputRef.current?.blur();
+  };
+
+  const suggestionTypeLabel: Record<SearchSuggestion['type'], string> = {
+    brand: 'Brand',
+    category: 'Category',
+    keyword: 'Search',
+    ean: 'EAN',
+  };
+
   if (isCompactVersion) {
     return (
       <>
@@ -845,31 +1057,55 @@ function App() {
                   />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen((v) => !v)}
-                  className={`inline-flex h-9 items-center rounded-lg border px-3 text-xs font-semibold transition-colors ${
-                    filtersOpen
-                      ? 'border-[hsl(221_72%_72%)] bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
-                      : 'border-[hsl(220_16%_84%)] bg-white text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]'
-                  }`}
-                >
-                  <Filter className="mr-1.5 h-3.5 w-3.5" />
-                  Filter
-                </button>
-
-                {activeFilterChips.length > 0 && (
-                  <div className="flex h-9 min-w-[240px] flex-1 items-center gap-2 rounded-lg border border-[hsl(220_16%_88%)] bg-white px-2.5">
-                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-[hsl(220_12%_46%)]">
-                      Current filters
-                    </span>
-                    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+                <div ref={searchBoxRef} className="relative flex min-h-9 min-w-[260px] flex-1 flex-wrap items-center gap-1 rounded-lg border border-[hsl(220_14%_89%)] bg-white px-2 py-1">
+                  <div className="flex min-w-0 flex-1 items-center">
+                    <Search className="h-3.5 w-3.5 shrink-0 text-[hsl(220_12%_55%)]" />
+                    <input
+                      ref={searchInputRef}
+                      type="search"
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      onFocus={() => {
+                        if (searchSuggestions.length > 0 || suggestionsLoading) {
+                          setSuggestionsOpen(true);
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (!suggestionsOpen && searchSuggestions.length > 0 && event.key === 'ArrowDown') {
+                          event.preventDefault();
+                          setSuggestionsOpen(true);
+                          setActiveSuggestionIndex(0);
+                          return;
+                        }
+                        if (!suggestionsOpen || searchSuggestions.length === 0) return;
+                        if (event.key === 'ArrowDown') {
+                          event.preventDefault();
+                          setActiveSuggestionIndex((index) => Math.min(index + 1, searchSuggestions.length - 1));
+                        } else if (event.key === 'ArrowUp') {
+                          event.preventDefault();
+                          setActiveSuggestionIndex((index) => Math.max(index - 1, 0));
+                        } else if (event.key === 'Enter' && activeSuggestionIndex >= 0) {
+                          event.preventDefault();
+                          const selected = searchSuggestions[activeSuggestionIndex];
+                          if (selected) applySuggestion(selected);
+                        } else if (event.key === 'Escape') {
+                          event.preventDefault();
+                          setSuggestionsOpen(false);
+                          setActiveSuggestionIndex(-1);
+                        }
+                      }}
+                      placeholder={searchPlaceholder}
+                      className="h-7 min-w-0 flex-1 border-0 bg-transparent px-2 text-xs text-[hsl(222_47%_8%)] placeholder:text-[hsl(220_12%_60%)] focus:outline-none"
+                    />
+                  </div>
+                  {activeFilterChips.length > 0 && (
+                    <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
                       {activeFilterChips.map((chip) => (
                         <button
                           key={chip.key}
                           type="button"
                           onClick={chip.clear}
-                          className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-[hsl(220_16%_84%)] bg-[hsl(220_18%_98%)] px-2 text-[11px] font-medium text-[hsl(220_24%_24%)] hover:bg-[hsl(221_80%_96%)]"
+                          className="inline-flex h-7 items-center gap-1 rounded-md border border-[hsl(220_16%_84%)] bg-[hsl(220_18%_98%)] px-2 text-[11px] font-semibold text-[hsl(220_24%_24%)] hover:bg-[hsl(221_80%_96%)]"
                           title={`Remove ${chip.label} filter`}
                         >
                           <span className="max-w-[160px] truncate">{chip.label}</span>
@@ -877,39 +1113,157 @@ function App() {
                         </button>
                       ))}
                     </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setFiltersOpen((v) => !v)}
+                    className={`inline-flex h-7 shrink-0 items-center rounded-md border px-2 text-[11px] font-semibold transition-colors ${
+                      filtersOpen
+                        ? 'border-[hsl(221_72%_72%)] bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
+                        : 'border-[hsl(220_16%_84%)] bg-white text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]'
+                    }`}
+                  >
+                    <Filter className="mr-1 h-3 w-3" />
+                    Filters
+                  </button>
+                  <div className="inline-flex h-7 shrink-0 items-center overflow-hidden rounded-md border border-[hsl(220_16%_84%)] bg-white">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('grid')}
+                      className={`h-full px-2 text-[10px] font-semibold ${
+                        viewMode === 'grid'
+                          ? 'bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
+                          : 'text-[hsl(220_12%_45%)] hover:bg-[hsl(220_18%_95%)]'
+                      }`}
+                    >
+                      Pictures
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('list')}
+                      className={`h-full border-l border-[hsl(220_16%_84%)] px-2 text-[10px] font-semibold ${
+                        viewMode === 'list'
+                          ? 'bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
+                          : 'text-[hsl(220_12%_45%)] hover:bg-[hsl(220_18%_95%)]'
+                      }`}
+                    >
+                      List
+                    </button>
                   </div>
-                )}
+                  {loading ? (
+                    <span className="inline-flex h-7 shrink-0 items-center rounded-md border border-[hsl(221_72%_72%)] bg-[hsl(221_84%_95%)] px-2 text-[10px] font-semibold text-[hsl(221_72%_32%)]">
+                      Loading results...
+                    </span>
+                  ) : null}
 
-                <div className="ml-auto flex flex-wrap items-center gap-1.5 text-xs text-[hsl(220_12%_50%)]">
-                  <span className="inline-flex h-9 items-center px-1 text-[hsl(220_16%_40%)]">
-                    {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-                    {totalProducts.toLocaleString()} products
-                  </span>
-                  <Link
-                    to="/about-us"
+                  {suggestionsOpen && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-[hsl(220_16%_84%)] bg-white shadow-[0_10px_28px_rgb(18_32_74/0.16)]">
+                      {searchSuggestions.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-[hsl(220_12%_46%)]">No suggestions yet</div>
+                      ) : (
+                        <div className="max-h-72 overflow-y-auto py-1">
+                          {searchSuggestions.map((suggestion, index) => (
+                            <button
+                              key={`${suggestion.type}:${suggestion.value}:${index}`}
+                              type="button"
+                              onPointerDown={(event) => {
+                                event.preventDefault();
+                                applySuggestion(suggestion);
+                              }}
+                              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${
+                                index === activeSuggestionIndex
+                                  ? 'bg-[hsl(221_84%_95%)] text-[hsl(221_72%_24%)]'
+                                  : 'text-[hsl(222_47%_16%)] hover:bg-[hsl(220_18%_96%)]'
+                              }`}
+                            >
+                              <span className="inline-flex shrink-0 rounded-md border border-[hsl(220_16%_84%)] bg-[hsl(220_18%_98%)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[hsl(220_12%_44%)]">
+                                {suggestionTypeLabel[suggestion.type]}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate">{suggestion.label}</span>
+                              {suggestion.hitCount > 0 ? (
+                                <span className="shrink-0 text-[10px] text-[hsl(220_12%_50%)]">{suggestion.hitCount}</span>
+                              ) : null}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {suggestionsLoading ? (
+                        <div className="border-t border-[hsl(220_16%_90%)] px-3 py-1.5 text-[10px] text-[hsl(220_12%_46%)]">Loading more suggestions...</div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-[hsl(220_12%_50%)]">
+                  {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin text-[hsl(220_16%_40%)]" /> : null}
+                  <a
+                    href="https://app.eanrunner.com/"
+                    target="_blank"
+                    rel="noreferrer"
                     className="inline-flex h-9 items-center rounded-lg border border-[hsl(220_16%_84%)] bg-white px-3 text-xs font-semibold text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
                   >
-                    About us
-                  </Link>
+                    Login
+                  </a>
+                  <div className="relative" ref={menuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setMenuOpen((v) => !v)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[hsl(220_16%_84%)] bg-white text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
+                      aria-label="Open menu"
+                      title="Menu"
+                    >
+                      <Menu className="h-4 w-4" />
+                    </button>
+
+                    {menuOpen && (
+                      <div className="absolute right-0 top-11 z-50 w-[280px] rounded-xl border border-[hsl(220_16%_84%)] bg-white p-3 shadow-[0_12px_30px_rgb(18_32_74/0.18)]">
+                        <div className="space-y-3 text-[12px] text-[hsl(222_47%_18%)]">
+                          <section>
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_46%)]">Explore</p>
+                            <div className="flex flex-col gap-1">
+                              <Link to="/for-retailers" className="hover:underline" onClick={() => setMenuOpen(false)}>For Retailers</Link>
+                              <Link to="/for-distributors" className="hover:underline" onClick={() => setMenuOpen(false)}>For Distributors</Link>
+                              <Link to="/about-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Our story</Link>
+                              <Link to="/about-us" className="hover:underline" onClick={() => setMenuOpen(false)}>How it works</Link>
+                              <Link to="/work-with-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Work with us</Link>
+                              <a href="https://www.eanrunner.com" target="_blank" rel="noreferrer" className="hover:underline">Blog</a>
+                            </div>
+                          </section>
+
+                          <section className="border-t border-[hsl(220_14%_90%)] pt-2">
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_46%)]">Company</p>
+                            <p className="text-[11px] text-[hsl(220_14%_36%)]">EANrunner by Etaility AB</p>
+                            <p className="text-[11px] text-[hsl(220_14%_36%)]">VAT SE559006389601</p>
+                            <a href="mailto:info@eanrunner.com" className="text-[11px] text-[hsl(221_92%_42%)] hover:underline">info@eanrunner.com</a>
+                          </section>
+
+                          <section className="border-t border-[hsl(220_14%_90%)] pt-2">
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_46%)]">Follow</p>
+                            <a href="https://www.linkedin.com/company/eanrunner" target="_blank" rel="noreferrer" className="hover:underline">LinkedIn</a>
+                          </section>
+
+                          <section className="border-t border-[hsl(220_14%_90%)] pt-2">
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_46%)]">Integrations</p>
+                            <p className="text-[11px] text-[hsl(220_14%_36%)]">Shopify · WooCommerce · Quickbutik · Magento · BigQuery</p>
+                          </section>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {loading ? (
+                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-[hsl(220_16%_90%)]">
+                  <div className="catalog-loading-bar__indicator h-full w-1/3 rounded-full bg-[hsl(221_92%_55%)]" />
+                </div>
+              ) : null}
 
             </div>
 
             {filtersOpen && (
               <div className="border-t border-[hsl(220_14%_91%)] bg-[hsl(220_18%_97%)]">
                 <div className="mx-auto grid w-full max-w-[1760px] grid-cols-1 gap-3 px-4 py-3 lg:grid-cols-12">
-                  <label className="space-y-1.5 lg:col-span-4">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(220_12%_50%)]">Search</span>
-                    <input
-                      type="search"
-                      value={keyword}
-                      onChange={(e) => setKeyword(e.target.value)}
-                      placeholder="EAN, title, brand…"
-                      className="w-full rounded-md border border-[hsl(220_14%_89%)] bg-white px-3 py-2 text-xs text-[hsl(222_47%_8%)] placeholder:text-[hsl(220_12%_60%)] focus:outline-none focus:ring-1 focus:ring-[hsl(221_92%_55%)]"
-                    />
-                  </label>
-
                   <label className="space-y-1.5 lg:col-span-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(220_12%_50%)]">Market</span>
                     <select
@@ -1156,13 +1510,21 @@ function App() {
                   </div>
                 )}
 
-                {brandGroups.map((group) => (
+                {brandGroups.map((group, groupIndex) => {
+                  const isSecondLine = groupIndex === 1;
+                  const previewLimit = isSecondLine && showIntroCard ? Math.min(6, compactBrandPreviewCount) : compactBrandPreviewCount;
+                  const introTileSpan = Math.max(1, compactBrandPreviewCount - previewLimit);
+                  const showIntroTile = isSecondLine && showIntroCard && introTileSpan > 0;
+
+                  return (
                   <section key={group.brand} className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[hsl(220_14%_89%)] bg-white px-3 py-2">
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-[hsl(222_47%_8%)] truncate">{group.brand}</div>
-                        <div className="text-[10px] text-[hsl(220_12%_50%)]">
-                          Latest added: {group.latestUpdatedAt ? new Date(group.latestUpdatedAt).toLocaleString() : 'Unknown'} · {group.totalProducts.toLocaleString()} products
+                        <div className="text-sm font-semibold text-[hsl(222_47%_8%)] truncate">
+                          {group.brand}{' '}
+                          <span className="text-[11px] font-medium text-[hsl(220_12%_45%)]">
+                            ({group.totalProducts.toLocaleString()} products)
+                          </span>
                         </div>
                       </div>
                       <button
@@ -1183,16 +1545,86 @@ function App() {
                       className="grid gap-2"
                       style={{ gridTemplateColumns: `repeat(${compactBrandPreviewCount}, minmax(0, 1fr))` }}
                     >
-                      {group.items.slice(0, compactBrandPreviewCount).map((product) => (
+                      {group.items.slice(0, previewLimit).map((product) => (
                         <ProductCard
                           key={product.ean}
                           product={product}
                           compact
                         />
                       ))}
+                      {showIntroTile && (
+                        <article
+                          className="relative h-[330px] overflow-hidden rounded-lg border border-[hsl(221_70%_24%)] p-4 text-white shadow-[0_8px_24px_rgb(10_24_64/0.28)]"
+                          style={{ gridColumn: `span ${introTileSpan} / span ${introTileSpan}` }}
+                        >
+                          <div
+                            className="absolute inset-0"
+                            aria-hidden="true"
+                            style={{
+                              backgroundImage: [
+                                'linear-gradient(135deg, hsl(225 92% 16%) 0%, hsl(228 88% 14%) 45%, hsl(233 78% 23%) 100%)',
+                                'radial-gradient(120% 100% at 88% -8%, rgba(72, 96, 255, 0.28) 0%, rgba(72, 96, 255, 0) 58%)',
+                                'repeating-linear-gradient(90deg, rgba(255,255,255,0.07) 0 1px, rgba(255,255,255,0) 1px 28px)',
+                              ].join(','),
+                            }}
+                          />
+                          <div className="intro-bigmark" aria-hidden="true">
+                            <span className="intro-bigmark__bar intro-bigmark__bar--1" />
+                            <span className="intro-bigmark__bar intro-bigmark__bar--2" />
+                            <span className="intro-bigmark__bar intro-bigmark__bar--3" />
+                          </div>
+                          <div className="relative z-10 flex h-full flex-col pb-11">
+                          <button
+                            type="button"
+                            onClick={() => setShowIntroCard(false)}
+                            className="absolute right-0 top-0 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:bg-white/20"
+                            aria-label="Close introduction"
+                            title="Close"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+
+                          <img
+                            src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/logo-ean.png"
+                            alt="EANrunner"
+                            className="h-6 w-auto self-start object-contain brightness-0 invert"
+                          />
+
+                          <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9bb8ff]">Product data platform</p>
+                          <p className="mt-2 text-[20px] font-bold leading-[1.06] text-white sm:text-[24px] xl:text-[26px]">
+                            All supplier products,
+                            <br />
+                            one catalog,
+                            <br />
+                            <span className="text-[#a8caff]">priced for your market</span>
+                          </p>
+                          <p className="mt-3 max-w-[34ch] text-[12px] leading-relaxed text-white/80 sm:text-[13px]">
+                            Consolidated product data from European distributors, enriched,
+                            translated, and priced for your market, ready for your webshop.
+                          </p>
+                          <div className="absolute bottom-2 left-2.5 right-2.5 flex flex-wrap items-center gap-2">
+                            <Link
+                              to="/about-us"
+                              className="inline-flex items-center rounded-md border border-white/40 bg-white/10 px-1.5 py-1 text-[9px] font-semibold text-white hover:bg-white/20"
+                            >
+                              How it works
+                            </Link>
+                            <a
+                              href="https://app.eanrunner.com/"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center rounded-md border border-white/40 bg-white/10 px-1.5 py-1 text-[9px] font-semibold text-white hover:bg-white/20"
+                            >
+                              Login
+                            </a>
+                          </div>
+                          </div>
+                        </article>
+                      )}
                     </div>
                   </section>
-                ))}
+                  );
+                })}
 
                 {brandGroups.length < brandClusterTotalBrands && (
                   <div className="space-y-2 pt-1 pb-2">
@@ -1246,39 +1678,87 @@ function App() {
                   </div>
                 )}
 
-                <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
-                  {visibleProducts.map((product) => (
-                    <ProductCard
-                      key={product.ean}
-                      product={product}
-                      compact
-                    />
-                  ))}
-                </div>
+                {viewMode === 'grid' ? (
+                  <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
+                    {visibleProducts.map((product) => (
+                      <ProductCard
+                        key={product.ean}
+                        product={product}
+                        compact
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-[hsl(220_14%_89%)] bg-white">
+                    <table className="min-w-full text-left text-[12px] text-[hsl(222_47%_12%)]">
+                      <thead className="bg-[hsl(220_20%_97%)] text-[10px] uppercase tracking-wide text-[hsl(220_12%_45%)]">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">EAN</th>
+                          <th className="px-3 py-2 font-semibold">Brand</th>
+                          <th className="px-3 py-2 font-semibold">Title</th>
+                          <th className="px-3 py-2 font-semibold">Stock</th>
+                          <th className="px-3 py-2 font-semibold">Competition</th>
+                          <th className="px-3 py-2 font-semibold">Margin</th>
+                          <th className="px-3 py-2 font-semibold">Market</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleProducts.map((product) => {
+                          const level = competitionLevel(product.competitorCount);
+                          const hot = competitionBadge(level);
+                          const rangeLabel = marginRangeLabel(product.marginGrade, product.marketPrice, product.marketCurrency);
+                          return (
+                            <tr key={product.ean} className="border-t border-[hsl(220_14%_91%)] hover:bg-[hsl(220_22%_98%)]">
+                              <td className="px-3 py-2 font-mono text-[11px]">{product.ean}</td>
+                              <td className="px-3 py-2">{product.brand || '—'}</td>
+                              <td className="max-w-[520px] px-3 py-2">
+                                <Link to={`/product/${encodeURIComponent(product.ean)}`} className="line-clamp-1 hover:underline">
+                                  {product.title}
+                                </Link>
+                              </td>
+                              <td className="px-3 py-2">{product.stockStatus === 'in stock' ? '● In stock' : '🏭 Out'}</td>
+                              <td className="px-3 py-2">
+                                <span className={hot.chiliColor}>{'🌶'.repeat(hot.chiliCount)}</span>
+                              </td>
+                              <td className="px-3 py-2">{rangeLabel ?? 'Not available'}</td>
+                              <td className="px-3 py-2">
+                                {product.cheapestMarketLink ? (
+                                  <a href={product.cheapestMarketLink} target="_blank" rel="noreferrer" className="font-medium text-[hsl(221_92%_45%)] hover:underline">
+                                    {product.marketPrice != null
+                                      ? (product.marketCurrency === 'DKK' || product.marketCurrency === 'SEK'
+                                          ? `${Math.round(product.marketPrice)} kr`
+                                          : `€${product.marketPrice.toFixed(0)}`)
+                                      : 'Open'}
+                                  </a>
+                                ) : (
+                                  <span className="text-[hsl(220_12%_50%)]">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </>
             )}
 
-            {totalProducts > pageSize && !loading && !shouldClusterByBrand && !(isCompactVersion && decodedRouteBrand.trim()) && (
-              <div className="flex items-center justify-center gap-3 pt-2 pb-2">
-                <button
-                  type="button"
-                  onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  disabled={page === 1}
-                  className="px-4 py-1.5 text-xs font-medium rounded-md border border-[hsl(220_12%_80%)] bg-white text-[hsl(222_47%_12%)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[hsl(221_60%_97%)] transition-colors"
-                >
-                  ← Previous
-                </button>
+            {totalProducts > pageSize && !shouldClusterByBrand && !(isCompactVersion && decodedRouteBrand.trim()) && (
+              <div className="flex flex-col items-center justify-center gap-1.5 pt-2 pb-2">
+                {visibleProducts.length < totalProducts && (
+                  <button
+                    type="button"
+                    onClick={() => setListVisibleLimit((v) => v + LIST_LOAD_MORE_BATCH_SIZE)}
+                    disabled={loading}
+                    className="px-4 py-1.5 text-xs font-medium rounded-md border border-[hsl(220_12%_80%)] bg-white text-[hsl(222_47%_12%)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[hsl(221_60%_97%)] transition-colors"
+                  >
+                    {loading ? 'Loading…' : `Load ${LIST_LOAD_MORE_BATCH_SIZE} more`}
+                  </button>
+                )}
                 <span className="text-xs text-[hsl(220_12%_45%)]">
-                  Page {page} of {Math.ceil(totalProducts / pageSize)}
+                  Loaded {visibleProducts.length.toLocaleString()} of {totalProducts.toLocaleString()} products
                 </span>
-                <button
-                  type="button"
-                  onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  disabled={page >= Math.ceil(totalProducts / pageSize)}
-                  className="px-4 py-1.5 text-xs font-medium rounded-md border border-[hsl(220_12%_80%)] bg-white text-[hsl(222_47%_12%)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[hsl(221_60%_97%)] transition-colors"
-                >
-                  Next →
-                </button>
               </div>
             )}
 
@@ -1294,6 +1774,8 @@ function App() {
                 </button>
               </div>
             )}
+
+            <SiteFooter className="mt-10" />
           </div>
         </div>
 

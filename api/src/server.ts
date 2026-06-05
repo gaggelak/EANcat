@@ -18,15 +18,15 @@ const PUBLIC_RATE_LIMIT_WINDOW_MS = 60_000;
 const PUBLIC_RATE_LIMIT_MAX_REQUESTS = 120;
 const BRAND_CLUSTER_CACHE_TTL_MS = Number.parseInt(process.env.BRAND_CLUSTER_CACHE_TTL_MS || String(10 * 60 * 1000), 10);
 const BRAND_CLUSTER_CACHE_MAX_ENTRIES = Number.parseInt(process.env.BRAND_CLUSTER_CACHE_MAX_ENTRIES || '200', 10);
+const SQL_AUTH_MODE = (process.env.SQL_AUTH_MODE || 'sql-password').trim().toLowerCase();
+const SQL_USE_ENTRA_DEFAULT = SQL_AUTH_MODE === 'entra-default';
 
 // Connects to the ISOLATED public showcase DB (eanrunner-catalog-db), NOT
 // production. This API only ever reads the flat, public-safe dbo.showcase_product
 // table — it has no path to supplier names, cost prices, or margin percentages.
-const sqlConfig: sql.config = {
+const baseSqlConfig: sql.config = {
   server: process.env.SQL_SERVER || 'eanrunner-catalog-sql.database.windows.net',
   database: process.env.SQL_DATABASE || 'eanrunner-catalog-db',
-  user: process.env.SQL_USER || '',
-  password: process.env.SQL_PASSWORD || '',
   port: 1433,
   options: {
     encrypt: true,
@@ -36,17 +36,33 @@ const sqlConfig: sql.config = {
   requestTimeout: 30000,
 };
 
+const sqlConfig: sql.config = SQL_USE_ENTRA_DEFAULT
+  ? {
+      ...baseSqlConfig,
+      authentication: {
+        type: 'azure-active-directory-default',
+        options: {},
+      },
+    }
+  : {
+      ...baseSqlConfig,
+      user: process.env.SQL_USER || '',
+      password: process.env.SQL_PASSWORD || '',
+    };
+
 function sqlEnvSummary(): {
   server: string;
   database: string;
-  userConfigured: boolean;
-  passwordConfigured: boolean;
+  authMode: string;
+  sqlUserConfigured: boolean;
+  sqlPasswordConfigured: boolean;
 } {
   return {
     server: sqlConfig.server || '',
     database: sqlConfig.database || '',
-    userConfigured: Boolean(sqlConfig.user),
-    passwordConfigured: Boolean(sqlConfig.password),
+    authMode: SQL_USE_ENTRA_DEFAULT ? 'entra-default' : 'sql-password',
+    sqlUserConfigured: Boolean(process.env.SQL_USER),
+    sqlPasswordConfigured: Boolean(process.env.SQL_PASSWORD),
   };
 }
 
@@ -97,6 +113,14 @@ type BrandClusterResponsePayload = {
   count: number;
 };
 
+type SuggestionType = 'brand' | 'category' | 'keyword' | 'ean';
+type SuggestionItem = {
+  type: SuggestionType;
+  value: string;
+  label: string;
+  hitCount: number;
+};
+
 // ── Validation schemas ───────────────────────────────────────────────────────
 
 const ALLOWED_GRADES = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'N/A']);
@@ -130,6 +154,15 @@ const categoriesQuerySchema = z.object({
   market: z.enum(['dk', 'se', 'fi']).optional(),
   inStock: z.enum(['true', 'false']).optional(),
   hasImage: z.enum(['true', 'false']).optional(),
+});
+
+const suggestQuerySchema = z.object({
+  q: z.string().trim().min(1).max(80),
+  market: z.enum(['dk', 'se', 'fi']).optional(),
+  inStock: z.enum(['true', 'false']).optional(),
+  hasImage: z.enum(['true', 'false']).optional(),
+  limit: z.coerce.number().min(1).max(20).optional(),
+  types: z.string().trim().max(80).optional(),
 });
 
 const eanParamSchema = z.object({ market: z.enum(['dk', 'se', 'fi']).optional() });
@@ -236,6 +269,9 @@ function isLocalhostOrigin(origin: string): boolean {
 // ── Brand-cluster in-memory cache ─────────────────────────────────────────────
 
 const brandClusterCache = new Map<string, { payload: BrandClusterResponsePayload; expiresAt: number }>();
+const SUGGEST_CACHE_TTL_MS = 2 * 60 * 1000;
+const SUGGEST_CACHE_MAX_ENTRIES = 400;
+const suggestCache = new Map<string, { payload: SuggestionItem[]; expiresAt: number }>();
 
 function getBrandClusterCacheKey(parts: Record<string, unknown>): string {
   return JSON.stringify(parts);
@@ -257,6 +293,24 @@ function setCachedBrandClusters(key: string, payload: BrandClusterResponsePayloa
     if (oldestKey !== undefined) brandClusterCache.delete(oldestKey);
   }
   brandClusterCache.set(key, { payload, expiresAt: Date.now() + BRAND_CLUSTER_CACHE_TTL_MS });
+}
+
+function getCachedSuggestions(key: string): SuggestionItem[] | null {
+  const entry = suggestCache.get(key);
+  if (!entry) return null;
+  if (Date.now() >= entry.expiresAt) {
+    suggestCache.delete(key);
+    return null;
+  }
+  return entry.payload;
+}
+
+function setCachedSuggestions(key: string, payload: SuggestionItem[]): void {
+  if (suggestCache.size >= SUGGEST_CACHE_MAX_ENTRIES) {
+    const oldestKey = suggestCache.keys().next().value;
+    if (oldestKey !== undefined) suggestCache.delete(oldestKey);
+  }
+  suggestCache.set(key, { payload, expiresAt: Date.now() + SUGGEST_CACHE_TTL_MS });
 }
 
 // ── Connection pool ───────────────────────────────────────────────────────────
@@ -281,21 +335,30 @@ async function getPool(): Promise<sql.ConnectionPool> {
 
 async function prewarmDefaultBrandClusterCache(port: number): Promise<void> {
   try {
-    const params = new URLSearchParams({
-      market: 'dk',
-      brandOffset: '0',
-      brandLimit: '10',
-      perBrandLimit: '9',
-      minBrandProducts: '9',
-      inStock: 'true',
-      hasImage: 'true',
-    });
-    const response = await fetch(`http://localhost:${port}/api/public/brand-clusters?${params.toString()}`);
-    if (!response.ok) {
-      console.warn(`[BrandCluster prewarm] Failed: HTTP ${response.status}`);
+    const perBrandLimits = [2, 3, 6, 8, 9];
+    const responses = await Promise.all(
+      perBrandLimits.map(async (perBrandLimit) => {
+        const params = new URLSearchParams({
+          market: 'dk',
+          brandOffset: '0',
+          brandLimit: '10',
+          perBrandLimit: String(perBrandLimit),
+          minBrandProducts: '9',
+          inStock: 'true',
+          hasImage: 'true',
+        });
+        const response = await fetch(`http://localhost:${port}/api/public/brand-clusters?${params.toString()}`);
+        return { perBrandLimit, response };
+      }),
+    );
+
+    const failed = responses.filter(({ response }) => !response.ok);
+    if (failed.length > 0) {
+      console.warn(`[BrandCluster prewarm] Partial failure for perBrandLimit values: ${failed.map((f) => f.perBrandLimit).join(', ')}`);
       return;
     }
-    console.log('[BrandCluster prewarm] Default homepage cluster cache warmed');
+
+    console.log('[BrandCluster prewarm] Homepage cluster cache warmed for perBrandLimit 2,3,6,8,9');
   } catch (error) {
     console.warn('[BrandCluster prewarm] Failed to warm cache:', error);
   }
@@ -307,12 +370,17 @@ async function main(): Promise<void> {
   const app = express();
 
   const envSummary = sqlEnvSummary();
-  if (!envSummary.userConfigured || !envSummary.passwordConfigured) {
+  if (envSummary.authMode === 'sql-password' && (!envSummary.sqlUserConfigured || !envSummary.sqlPasswordConfigured)) {
     console.warn('SQL configuration is incomplete', envSummary);
   }
   if (process.env.NODE_ENV === 'production' && WEB_ORIGINS.some((origin) => origin.includes('localhost'))) {
     console.warn('CORS is configured with localhost origins in production', { WEB_ORIGINS });
   }
+
+  // Warm SQL connection in the background so the first public request avoids pool setup latency.
+  void getPool().catch((error) => {
+    console.warn('[SQL preconnect] Initial pool warm-up failed, will retry on demand:', error);
+  });
 
   app.use(cors({
     origin(origin, callback) {
@@ -404,14 +472,22 @@ async function main(): Promise<void> {
       const countRequest = pool.request();
       buildWhere(countRequest); // rebind same params on the count request
 
+      const shouldPrioritizeImages = brandValues.length > 0 && parsed.data.hasImage !== 'true';
+      const orderByClause = shouldPrioritizeImages
+        ? `ORDER BY CASE WHEN has_image = 1 THEN 0 ELSE 1 END,
+                 ${m.competitors} DESC,
+                 CASE WHEN ${m.grade} = 'N/A' THEN 1 ELSE 0 END,
+                 synced_at DESC, ean ASC`
+        : `ORDER BY ${m.competitors} DESC,
+                 CASE WHEN ${m.grade} = 'N/A' THEN 1 ELSE 0 END,
+                 synced_at DESC, ean ASC`;
+
       const [dataResult, countResult] = await Promise.all([
         dataRequest.query(`
           SELECT ${productSelectColumns(m)}
           FROM dbo.showcase_product
           ${whereClause}
-          ORDER BY ${m.competitors} DESC,
-                   CASE WHEN ${m.grade} = 'N/A' THEN 1 ELSE 0 END,
-                   synced_at DESC, ean ASC
+          ${orderByClause}
           OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
         `),
         countRequest.query(`SELECT COUNT(*) AS total FROM dbo.showcase_product ${whereClause}`),
@@ -621,22 +697,33 @@ async function main(): Promise<void> {
 
     try {
       const pool = await getPool();
-      const conditions = [`category IS NOT NULL AND LTRIM(RTRIM(category)) <> ''`];
-      if (parsed.data.inStock === 'true') conditions.push(`${m.inStock} = 1`);
-      if (parsed.data.hasImage === 'true') conditions.push('has_image = 1');
-      const whereClause = `WHERE ${conditions.join(' AND ')}`;
+      const categoryConditions = [`category IS NOT NULL AND LTRIM(RTRIM(category)) <> ''`];
+      const brandConditions: string[] = [];
+      if (parsed.data.inStock === 'true') {
+        categoryConditions.push(`${m.inStock} = 1`);
+        brandConditions.push(`${m.inStock} = 1`);
+      }
+      if (parsed.data.hasImage === 'true') {
+        categoryConditions.push('has_image = 1');
+        brandConditions.push('has_image = 1');
+      }
+      brandConditions.push("brand IS NOT NULL AND LTRIM(RTRIM(brand)) <> ''");
+
+      const categoryWhereClause = `WHERE ${categoryConditions.join(' AND ')}`;
+      const brandWhereClause = `WHERE ${brandConditions.join(' AND ')}`;
 
       const [categoryResult, brandResult] = await Promise.all([
         pool.request().query(`
           SELECT category, COUNT(*) AS product_count
-          FROM dbo.showcase_product ${whereClause}
+          FROM dbo.showcase_product ${categoryWhereClause}
           GROUP BY category ORDER BY product_count DESC
         `),
         pool.request().query(`
-          SELECT category, UPPER(LTRIM(RTRIM(brand))) AS brand
-          FROM dbo.showcase_product ${whereClause}
-            AND brand IS NOT NULL AND LTRIM(RTRIM(brand)) <> ''
-          GROUP BY category, UPPER(LTRIM(RTRIM(brand)))
+          SELECT
+            COALESCE(NULLIF(LTRIM(RTRIM(category)), ''), '__UNCATEGORIZED__') AS category,
+            UPPER(LTRIM(RTRIM(brand))) AS brand
+          FROM dbo.showcase_product ${brandWhereClause}
+          GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(category)), ''), '__UNCATEGORIZED__'), UPPER(LTRIM(RTRIM(brand)))
         `),
       ]);
 
@@ -660,10 +747,201 @@ async function main(): Promise<void> {
     }
   });
 
+  // ── GET /api/public/suggest ──────────────────────────────────────────────────
+  app.get('/api/public/suggest', async (req, res) => {
+    const parsed = suggestQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+
+    const queryText = normalizeQueryToken(parsed.data.q || '');
+    if (queryText.length < 2) {
+      res.json({ query: queryText, suggestions: [] });
+      return;
+    }
+
+    const limit = parsed.data.limit ?? 10;
+    const market = (parsed.data.market ?? 'dk') as Market;
+    const m = marketColumns(market);
+    const requestedTypes = splitCsv(parsed.data.types)
+      .map((item) => item.toLowerCase())
+      .filter((item): item is SuggestionType => item === 'brand' || item === 'category' || item === 'keyword' || item === 'ean');
+    const allowedTypes = new Set<SuggestionType>(requestedTypes.length > 0
+      ? requestedTypes
+      : ['brand', 'category', 'keyword', 'ean']);
+    const cacheKey = JSON.stringify({
+      q: queryText.toUpperCase(),
+      market,
+      inStock: parsed.data.inStock ?? 'false',
+      hasImage: parsed.data.hasImage ?? 'false',
+      limit,
+      types: [...allowedTypes].sort().join(','),
+    });
+    const cached = getCachedSuggestions(cacheKey);
+    if (cached) {
+      res.json({ query: queryText, suggestions: cached });
+      return;
+    }
+
+    try {
+      const pool = await getPool();
+      const normalizedUpper = queryText.toUpperCase();
+      const prefixUpper = `${normalizedUpper}%`;
+      const containsUpper = `%${normalizedUpper}%`;
+      const prefixExact = `${queryText}%`;
+      const eachLimit = Math.max(3, Math.min(8, limit));
+
+      const buildBaseWhere = () => {
+        const conditions: string[] = ['1=1'];
+        if (parsed.data.inStock === 'true') conditions.push(`${m.inStock} = 1`);
+        if (parsed.data.hasImage === 'true') conditions.push('has_image = 1');
+        return conditions;
+      };
+      const baseConditions = buildBaseWhere();
+      const baseWhere = `WHERE ${baseConditions.join(' AND ')}`;
+
+      const brandRequest = pool.request();
+      brandRequest.input('containsUpper', sql.NVarChar, containsUpper);
+      brandRequest.input('prefixUpper', sql.NVarChar, prefixUpper);
+      brandRequest.input('brandLimit', sql.Int, eachLimit);
+
+      const categoryRequest = pool.request();
+      categoryRequest.input('containsUpper', sql.NVarChar, containsUpper);
+      categoryRequest.input('prefixUpper', sql.NVarChar, prefixUpper);
+      categoryRequest.input('categoryLimit', sql.Int, eachLimit);
+
+      const keywordRequest = pool.request();
+      keywordRequest.input('containsUpper', sql.NVarChar, containsUpper);
+      keywordRequest.input('prefixUpper', sql.NVarChar, prefixUpper);
+      keywordRequest.input('keywordLimit', sql.Int, eachLimit);
+
+      const eanRequest = pool.request();
+      eanRequest.input('prefixExact', sql.VarChar, prefixExact);
+      eanRequest.input('eanLimit', sql.Int, Math.max(2, Math.min(5, limit)));
+
+      const brandPromise = allowedTypes.has('brand')
+        ? brandRequest.query(`
+          SELECT TOP (@brandLimit) value
+          FROM (
+            SELECT DISTINCT
+              UPPER(LTRIM(RTRIM(brand))) AS value,
+              CASE WHEN UPPER(LTRIM(RTRIM(brand))) LIKE @prefixUpper THEN 0 ELSE 1 END AS prefix_order
+            FROM dbo.showcase_product
+            ${baseWhere}
+              AND brand IS NOT NULL
+              AND LTRIM(RTRIM(brand)) <> ''
+              AND UPPER(LTRIM(RTRIM(brand))) LIKE @prefixUpper
+          ) AS s
+          ORDER BY s.prefix_order ASC, LEN(s.value) ASC, s.value ASC
+        `)
+        : Promise.resolve({ recordset: [] as Array<{ value: string }> });
+
+      const categoryPromise = allowedTypes.has('category')
+        ? categoryRequest.query(`
+          SELECT TOP (@categoryLimit) value
+          FROM (
+            SELECT DISTINCT
+              LTRIM(RTRIM(category)) AS value,
+              CASE WHEN UPPER(LTRIM(RTRIM(category))) LIKE @prefixUpper THEN 0 ELSE 1 END AS prefix_order
+            FROM dbo.showcase_product
+            ${baseWhere}
+              AND category IS NOT NULL
+              AND LTRIM(RTRIM(category)) <> ''
+              AND UPPER(LTRIM(RTRIM(category))) LIKE @prefixUpper
+          ) AS s
+          ORDER BY s.prefix_order ASC, LEN(s.value) ASC, s.value ASC
+        `)
+        : Promise.resolve({ recordset: [] as Array<{ value: string }> });
+
+      const keywordPromise = allowedTypes.has('keyword')
+        ? keywordRequest.query(`
+          SELECT TOP (@keywordLimit) value
+          FROM (
+            SELECT DISTINCT
+              LTRIM(RTRIM(title)) AS value,
+              CASE WHEN UPPER(LTRIM(RTRIM(title))) LIKE @prefixUpper THEN 0 ELSE 1 END AS prefix_order
+            FROM dbo.showcase_product
+            ${baseWhere}
+              AND title IS NOT NULL
+              AND LTRIM(RTRIM(title)) <> ''
+              AND UPPER(LTRIM(RTRIM(title))) LIKE @prefixUpper
+          ) AS s
+          ORDER BY s.prefix_order ASC, LEN(s.value) ASC, s.value ASC
+        `)
+        : Promise.resolve({ recordset: [] as Array<{ value: string }> });
+
+      const eanPromise = allowedTypes.has('ean')
+        ? eanRequest.query(`
+          SELECT TOP (@eanLimit)
+            ean AS value
+          FROM dbo.showcase_product
+          ${baseWhere}
+            AND ean LIKE @prefixExact
+          ORDER BY ean ASC
+        `)
+        : Promise.resolve({ recordset: [] as Array<{ value: string }> });
+
+      const [brandResult, categoryResult, keywordResult, eanResult] = await Promise.all([
+        brandPromise,
+        categoryPromise,
+        keywordPromise,
+        eanPromise,
+      ]);
+
+      const scored: Array<SuggestionItem & { score: number }> = [];
+      for (const row of brandResult.recordset as Array<{ value: string }>) {
+        const value = (row.value || '').trim();
+        if (!value) continue;
+        const startsWith = value.toUpperCase().startsWith(normalizedUpper);
+        scored.push({ type: 'brand', value, label: value, hitCount: 0, score: startsWith ? 120 : 100 });
+      }
+      for (const row of categoryResult.recordset as Array<{ value: string }>) {
+        const value = (row.value || '').trim();
+        if (!value) continue;
+        const startsWith = value.toUpperCase().startsWith(normalizedUpper);
+        scored.push({ type: 'category', value, label: value, hitCount: 0, score: startsWith ? 112 : 92 });
+      }
+      for (const row of keywordResult.recordset as Array<{ value: string }>) {
+        const value = (row.value || '').trim();
+        if (!value) continue;
+        const startsWith = value.toUpperCase().startsWith(normalizedUpper);
+        scored.push({ type: 'keyword', value, label: value, hitCount: 0, score: startsWith ? 86 : 78 });
+      }
+      for (const row of eanResult.recordset as Array<{ value: string }>) {
+        const value = (row.value || '').trim();
+        if (!value) continue;
+        scored.push({ type: 'ean', value, label: value, hitCount: 0, score: 130 });
+      }
+
+      const seen = new Set<string>();
+      const suggestions = scored
+        .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
+        .filter((item) => {
+          const key = `${item.type}:${item.value.toUpperCase()}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, limit)
+        .map(({ score: _score, ...item }) => item);
+
+      setCachedSuggestions(cacheKey, suggestions);
+      res.json({ query: queryText, suggestions });
+    } catch (err) {
+      console.error('Error fetching suggestions', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // ── GET /api/public/stats ──────────────────────────────────────────────────────
   app.get('/api/public/stats', async (_req, res) => {
     try {
       const pool = await getPool();
+      const configuredSupplierCount = (() => {
+        const parsed = Number.parseInt(process.env.INTEGRATED_SUPPLIERS_COUNT || '15', 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 15;
+      })();
       const result = await pool.request().query(`
         SELECT
           COUNT(*) AS total_products,
@@ -673,6 +951,7 @@ async function main(): Promise<void> {
       res.json({
         totalProducts: result.recordset[0]?.total_products ?? 0,
         inStockProducts: result.recordset[0]?.in_stock_products ?? 0,
+        integratedSuppliers: configuredSupplierCount,
       });
     } catch (err) {
       console.error('Error fetching catalog stats', err);

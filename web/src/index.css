@@ -35,4 +35,96 @@ body {
   min-height: 100vh;
 }
 
+@keyframes intro-bigmark-shimmer {
+  0%, 100% { transform: translate(-60%); opacity: 0; }
+  35% { opacity: 1; }
+  60% { transform: translate(60%); opacity: 0; }
+}
+
+@keyframes intro-bigmark-slide {
+  0%, 100% {
+    transform: translate(0px) skew(-14deg);
+    opacity: 0.42;
+    filter: brightness(0.9);
+  }
+  35% {
+    transform: translate(48px) skew(-14deg);
+    opacity: 1;
+    filter: brightness(1.7);
+  }
+  65% {
+    transform: translate(0px) skew(-14deg);
+    opacity: 0.42;
+    filter: brightness(0.9);
+  }
+}
+
+@keyframes catalog-loading-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.catalog-loading-bar__indicator {
+  animation: catalog-loading-progress 1.2s ease-in-out infinite;
+}
+
+.intro-bigmark {
+  position: absolute;
+  top: 50%;
+  right: -38%;
+  transform: translateY(-50%);
+  width: 86%;
+  max-width: 760px;
+  z-index: 1;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.intro-bigmark__bar {
+  position: relative;
+  overflow: hidden;
+  height: 52px;
+  border-radius: 10px 30px 30px 10px;
+  background: linear-gradient(100deg, rgba(130, 165, 255, 0.12), rgba(180, 205, 255, 0.45) 45%, rgba(130, 165, 255, 0.12));
+  transform: skew(-14deg);
+  animation: intro-bigmark-slide 6.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.intro-bigmark__bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 0%, transparent 30%, rgba(220, 233, 255, 0.55) 50%, transparent 70%, transparent 100%);
+  transform: translate(-60%);
+  animation: intro-bigmark-shimmer 6.5s ease-in-out infinite;
+}
+
+.intro-bigmark__bar--1 {
+  width: 70%;
+  margin-left: 12%;
+  animation-delay: 0s;
+}
+
+.intro-bigmark__bar--2 {
+  width: 130%;
+  margin-left: 0;
+  animation-delay: 0.45s;
+}
+
+.intro-bigmark__bar--3 {
+  width: 70%;
+  margin-left: 12%;
+  animation-delay: 0.9s;
+}
+
+.intro-bigmark__bar--1::before { animation-delay: 0s; }
+.intro-bigmark__bar--2::before { animation-delay: 0.45s; }
+.intro-bigmark__bar--3::before { animation-delay: 0.9s; }
+
 

@@ -21,6 +21,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mssql": "^12.5.2",
+    "webversion": "file:..",
     "zod": "^4.4.3"
   },
   "devDependencies": {

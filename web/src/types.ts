@@ -52,4 +52,19 @@ export type CategoriesResponse = {
 export type CatalogStatsResponse = {
   totalProducts: number;
   inStockProducts: number;
+  integratedSuppliers: number;
+};
+
+export type SearchSuggestionType = 'brand' | 'category' | 'keyword' | 'ean';
+
+export type SearchSuggestion = {
+  type: SearchSuggestionType;
+  value: string;
+  label: string;
+  hitCount: number;
+};
+
+export type SearchSuggestResponse = {
+  query: string;
+  suggestions: SearchSuggestion[];
 };

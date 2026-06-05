@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Loader2, Package, ExternalLink } from 'lucide-react';
 import { getProductByEan } from './api';
 import type { MarginGrade, PublicProduct } from './types';
+import SiteFooter from './SiteFooter';
 
 const GRADE_BADGE: Record<MarginGrade, string> = {
   A: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -194,7 +195,9 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      <div className="h-16" />
+      <div className="max-w-6xl mx-auto px-4 pb-8">
+        <SiteFooter className="mt-2" />
+      </div>
     </div>
   );
 }
