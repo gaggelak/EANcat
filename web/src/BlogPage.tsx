@@ -60,7 +60,7 @@ export default function BlogPage() {
                     <div className="mt-3 grid gap-2 sm:grid-cols-3">
                       {item.images.map((image) => (
                         <div key={image.src} className="overflow-hidden rounded-lg border border-[hsl(220_14%_90%)] bg-white">
-                          <img src={image.src} alt={image.alt} className="h-28 w-full object-cover" loading="lazy" />
+                          <img src={image.src} alt={image.alt} className="h-40 w-full object-contain" loading="lazy" />
                         </div>
                       ))}
                     </div>

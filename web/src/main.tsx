@@ -23,6 +23,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/" element={<App />} />
           <Route path="/brand/:brandParam" element={<App />} />
           <Route path="/about-us" element={<AboutUsPage />} />
+          <Route path="/how-it-works" element={<AboutUsPage />} />
           <Route path="/for-retailers" element={<ForRetailersPage />} />
           <Route path="/for-distributors" element={<ForDistributorsPage />} />
           <Route path="/get-approved" element={<GetApprovedPage />} />

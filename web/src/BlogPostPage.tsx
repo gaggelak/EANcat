@@ -55,7 +55,7 @@ export default function BlogPostPage() {
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               {post.images.map((image) => (
                 <div key={image.src} className="overflow-hidden rounded-lg border border-[hsl(220_14%_90%)] bg-[hsl(220_20%_98%)]">
-                  <img src={image.src} alt={image.alt} className="h-48 w-full object-cover" loading="lazy" />
+                  <img src={image.src} alt={image.alt} className="h-64 w-full object-contain" loading="lazy" />
                 </div>
               ))}
             </div>

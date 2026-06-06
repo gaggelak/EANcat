@@ -16,7 +16,26 @@ const BRAND_CLUSTER_REQUEST_TIMEOUT_MS = 7000;
 const ABOVE_THE_FOLD_PRIORITY_COUNT = 8;
 const FILTER_OPTIONS_CACHE_KEY = 'webversion.filter-options.cache.v2';
 const FILTER_OPTIONS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const HOME_CATALOG_CACHE_KEY = 'webversion.home-catalog.cache.v1';
+const HOME_CATALOG_CACHE_TTL_MS = 60 * 60 * 1000;
 const URL_ALLOWED_GRADES = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'N/A']);
+
+type HomeCatalogCachePayload =
+  | {
+      timestamp: number;
+      mode: 'clusters';
+      cacheKey: string;
+      brandClusterGroups: BrandClusterGroup[];
+      totalProducts: number;
+      totalBrands: number;
+    }
+  | {
+      timestamp: number;
+      mode: 'products';
+      cacheKey: string;
+      products: PublicProduct[];
+      totalProducts: number;
+    };
 
 function parseBooleanQueryParam(value: string | null): boolean | null {
   if (value == null) return null;
@@ -173,6 +192,40 @@ function saveFilterOptionsCache(
       cacheKey,
       JSON.stringify({ timestamp: Date.now(), categories, brandsByCategory }),
     );
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function getHomeCatalogCacheKey(mode: 'clusters' | 'products', options: {
+  market: string;
+  previewCount?: number;
+  limit?: number;
+}): string {
+  return [
+    mode,
+    options.market,
+    options.previewCount ?? '-',
+    options.limit ?? '-',
+  ].join('.');
+}
+
+function loadHomeCatalogCache(cacheKey: string): HomeCatalogCachePayload | null {
+  try {
+    const raw = localStorage.getItem(HOME_CATALOG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as HomeCatalogCachePayload;
+    if (!parsed?.timestamp || parsed.cacheKey !== cacheKey) return null;
+    if (Date.now() - parsed.timestamp > HOME_CATALOG_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveHomeCatalogCache(payload: HomeCatalogCachePayload): void {
+  try {
+    localStorage.setItem(HOME_CATALOG_CACHE_KEY, JSON.stringify(payload));
   } catch {
     // Ignore storage failures.
   }
@@ -401,6 +454,7 @@ function App() {
     && hasPictureOnly === false;
   const pageSize = shouldUseCompactPreviewPageSize ? compactPreviewPageSize : defaultListPageSize;
   const compactBrandPreviewCount = getCompactBrandPreviewCountForWidth(viewportWidth);
+  const isMobileViewport = viewportWidth < 768;
   const shouldClusterByBrand = isCompactVersion
     && viewMode === 'grid'
     && selectedCategoryValues.length === 0
@@ -536,6 +590,11 @@ function App() {
   }, [isCompactVersion]);
 
   useEffect(() => {
+    if (!isMobileViewport) return;
+    if (viewMode !== 'grid') setViewMode('grid');
+  }, [isMobileViewport, viewMode]);
+
+  useEffect(() => {
     if (!hasHydratedFiltersFromUrlRef.current) return;
     if (skipNextUrlWriteRef.current) {
       skipNextUrlWriteRef.current = false;
@@ -616,10 +675,55 @@ function App() {
   useEffect(() => {
     let active = true;
     async function load() {
+      const normalizedKeyword = debouncedKeyword.trim();
+      const canUseHomeCatalogCache = isCompactVersion
+        && !decodedRouteBrand.trim()
+        && !normalizedKeyword
+        && selectedCategoryValues.length === 0
+        && selectedBrandValues.length === 0
+        && selectedCompetitionLevels.size === 0
+        && selectedGrades.size === 0
+        && market === 'dk'
+        && inStockOnly === true
+        && hasPictureOnly === false;
+
+      if (canUseHomeCatalogCache) {
+        const clusterCacheKey = getHomeCatalogCacheKey('clusters', {
+          market,
+          previewCount: compactBrandPreviewCount,
+        });
+        const productCacheKey = getHomeCatalogCacheKey('products', {
+          market,
+          limit: Math.max(listVisibleLimit, pageSize),
+        });
+        const cached = loadHomeCatalogCache(shouldClusterByBrand ? clusterCacheKey : productCacheKey);
+
+        if (cached) {
+          setError('');
+          setHasLoadedTotalProducts(true);
+
+          if (cached.mode === 'clusters') {
+            setDisableBrandClusters(false);
+            setBrandClusterGroups(cached.brandClusterGroups);
+            setBrandClusterTotalBrands(cached.totalBrands);
+            setTotalProducts(cached.totalProducts);
+            setProducts([]);
+          } else {
+            setDisableBrandClusters(true);
+            setBrandClusterGroups([]);
+            setBrandClusterTotalBrands(0);
+            setProducts(cached.products);
+            setTotalProducts(cached.totalProducts);
+          }
+
+          setLoading(false);
+          return;
+        }
+      }
+
       setLoading(true);
       setError('');
       try {
-        const normalizedKeyword = debouncedKeyword.trim();
         if (shouldClusterByBrand) {
           try {
             const clusterData = await withTimeout(
@@ -646,6 +750,20 @@ function App() {
             setTotalProducts(clusterData.totalProducts);
             setHasLoadedTotalProducts(true);
             setProducts([]);
+
+            if (canUseHomeCatalogCache && brandClusterOffset === 0) {
+              saveHomeCatalogCache({
+                timestamp: Date.now(),
+                mode: 'clusters',
+                cacheKey: getHomeCatalogCacheKey('clusters', {
+                  market,
+                  previewCount: compactBrandPreviewCount,
+                }),
+                brandClusterGroups: clusterData.brands,
+                totalProducts: clusterData.totalProducts,
+                totalBrands: clusterData.totalBrands,
+              });
+            }
             return;
           } catch (clusterErr) {
             if (!active) return;
@@ -680,6 +798,19 @@ function App() {
         setProducts(data.products);
         setTotalProducts(backendTotal);
         setHasLoadedTotalProducts(true);
+
+        if (canUseHomeCatalogCache) {
+          saveHomeCatalogCache({
+            timestamp: Date.now(),
+            mode: 'products',
+            cacheKey: getHomeCatalogCacheKey('products', {
+              market,
+              limit: effectiveLimit,
+            }),
+            products: data.products,
+            totalProducts: backendTotal,
+          });
+        }
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : 'Could not load products');
@@ -1109,22 +1240,6 @@ function App() {
                       className="h-7 min-w-0 flex-1 border-0 bg-transparent px-2 text-xs text-[hsl(222_47%_8%)] placeholder:text-[hsl(220_12%_60%)] focus:outline-none"
                     />
                   </div>
-                  {activeFilterChips.length > 0 && (
-                    <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
-                      {activeFilterChips.map((chip) => (
-                        <button
-                          key={chip.key}
-                          type="button"
-                          onClick={chip.clear}
-                          className="inline-flex h-7 items-center gap-1 rounded-md border border-[hsl(220_16%_84%)] bg-[hsl(220_18%_98%)] px-2 text-[11px] font-semibold text-[hsl(220_24%_24%)] hover:bg-[hsl(221_80%_96%)]"
-                          title={`Remove ${chip.label} filter`}
-                        >
-                          <span className="max-w-[160px] truncate">{chip.label}</span>
-                          <X className="h-3 w-3" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
                   <button
                     type="button"
                     onClick={() => setFiltersOpen((v) => !v)}
@@ -1149,17 +1264,19 @@ function App() {
                     >
                       Pictures
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('list')}
-                      className={`h-full border-l border-[hsl(220_16%_84%)] px-2 text-[10px] font-semibold ${
-                        viewMode === 'list'
-                          ? 'bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
-                          : 'text-[hsl(220_12%_45%)] hover:bg-[hsl(220_18%_95%)]'
-                      }`}
-                    >
-                      List
-                    </button>
+                    {!isMobileViewport && (
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('list')}
+                        className={`h-full border-l border-[hsl(220_16%_84%)] px-2 text-[10px] font-semibold ${
+                          viewMode === 'list'
+                            ? 'bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
+                            : 'text-[hsl(220_12%_45%)] hover:bg-[hsl(220_18%_95%)]'
+                        }`}
+                      >
+                        List
+                      </button>
+                    )}
                   </div>
                   {loading ? (
                     <span className="inline-flex h-7 shrink-0 items-center rounded-md border border-[hsl(221_72%_72%)] bg-[hsl(221_84%_95%)] px-2 text-[10px] font-semibold text-[hsl(221_72%_32%)]">
@@ -1207,14 +1324,16 @@ function App() {
 
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-[hsl(220_12%_50%)]">
                   {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin text-[hsl(220_16%_40%)]" /> : null}
-                  <a
-                    href="https://app.eanrunner.com/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex h-9 items-center rounded-lg border border-[hsl(220_16%_84%)] bg-white px-3 text-xs font-semibold text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
-                  >
-                    Login
-                  </a>
+                  {!isMobileViewport && (
+                    <a
+                      href="https://app.eanrunner.com/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex h-9 items-center rounded-lg border border-[hsl(220_16%_84%)] bg-white px-3 text-xs font-semibold text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
+                    >
+                      Login
+                    </a>
+                  )}
                   <div className="relative" ref={menuRef}>
                     <button
                       type="button"
@@ -1229,14 +1348,28 @@ function App() {
                     {menuOpen && (
                       <div className="absolute right-0 top-11 z-50 w-[296px] rounded-xl border border-[hsl(220_16%_84%)] bg-white p-4 shadow-[0_12px_30px_rgb(18_32_74/0.18)]">
                         <div className="space-y-4 text-[13px] text-[hsl(222_47%_18%)]">
+                          {isMobileViewport && (
+                            <section>
+                              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Account</p>
+                              <a
+                                href="https://app.eanrunner.com/"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-[hsl(220_18%_98%)] px-2.5 py-1 text-[12px] font-semibold text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
+                                onClick={() => setMenuOpen(false)}
+                              >
+                                Login
+                              </a>
+                            </section>
+                          )}
                           <section>
                             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Explore</p>
                             <div className="flex flex-col gap-1 text-[13px] leading-6">
                               <Link to="/for-retailers" className="hover:underline" onClick={() => setMenuOpen(false)}>For Retailers</Link>
                               <Link to="/for-distributors" className="hover:underline" onClick={() => setMenuOpen(false)}>For Distributors</Link>
                               <Link to="/about-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Our story</Link>
-                              <Link to="/about-us" className="hover:underline" onClick={() => setMenuOpen(false)}>How it works</Link>
-                              <Link to="/work-with-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Work with us</Link>
+                              <Link to="/how-it-works" className="hover:underline" onClick={() => setMenuOpen(false)}>How it works</Link>
+                              <Link to="/work-with-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Small team. Big network.</Link>
                               <Link to="/blog" className="hover:underline" onClick={() => setMenuOpen(false)}>Blog</Link>
                             </div>
                           </section>
@@ -1260,6 +1393,23 @@ function App() {
                   </div>
                 </div>
               </div>
+
+              {activeFilterChips.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                  {activeFilterChips.map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={chip.clear}
+                      className="inline-flex h-7 items-center gap-1 rounded-md border border-[hsl(220_16%_84%)] bg-[hsl(220_18%_98%)] px-2 text-[11px] font-semibold text-[hsl(220_24%_24%)] hover:bg-[hsl(221_80%_96%)]"
+                      title={`Remove ${chip.label} filter`}
+                    >
+                      <span className="max-w-[160px] truncate">{chip.label}</span>
+                      <X className="h-3 w-3" />
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {loading ? (
                 <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-[hsl(220_16%_90%)]">
@@ -1518,11 +1668,151 @@ function App() {
                   </div>
                 )}
 
+                {showIntroCard && isMobileViewport && (
+                  <article className="relative min-h-[320px] overflow-hidden rounded-lg border border-[hsl(221_70%_24%)] p-4 text-white shadow-[0_8px_24px_rgb(10_24_64/0.28)]">
+                    <div
+                      className="absolute inset-0"
+                      aria-hidden="true"
+                      style={{
+                        backgroundImage: [
+                          'linear-gradient(135deg, hsl(225 92% 16%) 0%, hsl(228 88% 14%) 45%, hsl(233 78% 23%) 100%)',
+                          'radial-gradient(120% 100% at 88% -8%, rgba(72, 96, 255, 0.28) 0%, rgba(72, 96, 255, 0) 58%)',
+                          'repeating-linear-gradient(90deg, rgba(255,255,255,0.07) 0 1px, rgba(255,255,255,0) 1px 28px)',
+                        ].join(','),
+                      }}
+                    />
+                    <div className="intro-bigmark" aria-hidden="true">
+                      <span className="intro-bigmark__bar intro-bigmark__bar--1" />
+                      <span className="intro-bigmark__bar intro-bigmark__bar--2" />
+                      <span className="intro-bigmark__bar intro-bigmark__bar--3" />
+                    </div>
+                    <div className="relative z-10 flex h-full flex-col">
+                      <button
+                        type="button"
+                        onClick={() => setShowIntroCard(false)}
+                        className="absolute right-0 top-0 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:bg-white/20"
+                        aria-label="Close introduction"
+                        title="Close"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+
+                      <img
+                        src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/logo-ean.png"
+                        alt="EANrunner"
+                        className="h-6 w-auto self-start object-contain brightness-0 invert"
+                      />
+
+                      <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9bb8ff]">Product data platform</p>
+                      <p className="mt-2 text-[19px] font-bold leading-[1.06] text-white sm:text-[24px] xl:text-[26px]">
+                        All supplier products,
+                        <br />
+                        one catalog,
+                        <br />
+                        <span className="text-[#a8caff]">priced for your market</span>
+                      </p>
+                      <p className="mt-3 max-w-[34ch] text-[12px] leading-relaxed text-white/80 sm:text-[13px]">
+                        Consolidated product data from European distributors, enriched,
+                        translated, and priced for your market, ready for your webshop.
+                      </p>
+                      <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
+                        <Link
+                          to="/how-it-works"
+                          className="inline-flex items-center rounded-md border border-white/40 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white hover:bg-white/20"
+                        >
+                          How it works
+                        </Link>
+                        <a
+                          href="https://app.eanrunner.com/"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center rounded-md border border-white/40 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white hover:bg-white/20"
+                        >
+                          Login
+                        </a>
+                      </div>
+                    </div>
+                  </article>
+                )}
+
                 {brandGroups.map((group, groupIndex) => {
                   const isSecondLine = groupIndex === 1;
-                  const previewLimit = isSecondLine && showIntroCard ? Math.min(6, compactBrandPreviewCount) : compactBrandPreviewCount;
-                  const introTileSpan = Math.max(1, compactBrandPreviewCount - previewLimit);
-                  const showIntroTile = isSecondLine && showIntroCard && introTileSpan > 0;
+                  const showIntroTile = showIntroCard && !isMobileViewport && isSecondLine;
+                  const previewLimit = showIntroTile
+                    ? Math.min(6, compactBrandPreviewCount)
+                    : compactBrandPreviewCount;
+                  const introTileSpan = showIntroTile
+                    ? Math.max(1, compactBrandPreviewCount - previewLimit)
+                    : 0;
+                  const introTile = showIntroTile ? (
+                    <article
+                      className="relative min-h-[320px] overflow-hidden rounded-lg border border-[hsl(221_70%_24%)] p-4 text-white shadow-[0_8px_24px_rgb(10_24_64/0.28)]"
+                      style={{ gridColumn: `span ${introTileSpan} / span ${introTileSpan}` }}
+                    >
+                      <div
+                        className="absolute inset-0"
+                        aria-hidden="true"
+                        style={{
+                          backgroundImage: [
+                            'linear-gradient(135deg, hsl(225 92% 16%) 0%, hsl(228 88% 14%) 45%, hsl(233 78% 23%) 100%)',
+                            'radial-gradient(120% 100% at 88% -8%, rgba(72, 96, 255, 0.28) 0%, rgba(72, 96, 255, 0) 58%)',
+                            'repeating-linear-gradient(90deg, rgba(255,255,255,0.07) 0 1px, rgba(255,255,255,0) 1px 28px)',
+                          ].join(','),
+                        }}
+                      />
+                      <div className="intro-bigmark" aria-hidden="true">
+                        <span className="intro-bigmark__bar intro-bigmark__bar--1" />
+                        <span className="intro-bigmark__bar intro-bigmark__bar--2" />
+                        <span className="intro-bigmark__bar intro-bigmark__bar--3" />
+                      </div>
+                      <div className="relative z-10 flex h-full flex-col">
+                        <button
+                          type="button"
+                          onClick={() => setShowIntroCard(false)}
+                          className="absolute right-0 top-0 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:bg-white/20"
+                          aria-label="Close introduction"
+                          title="Close"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+
+                        <img
+                          src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/logo-ean.png"
+                          alt="EANrunner"
+                          className="h-6 w-auto self-start object-contain brightness-0 invert"
+                        />
+
+                        <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9bb8ff]">Product data platform</p>
+                        <p className="mt-2 text-[19px] font-bold leading-[1.06] text-white sm:text-[24px] xl:text-[26px]">
+                          All supplier products,
+                          <br />
+                          one catalog,
+                          <br />
+                          <span className="text-[#a8caff]">priced for your market</span>
+                        </p>
+                        <p className="mt-3 max-w-[34ch] text-[12px] leading-relaxed text-white/80 sm:text-[13px]">
+                          Consolidated product data from European distributors, enriched,
+                          translated, and priced for your market, ready for your webshop.
+                        </p>
+                        <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
+                          <Link
+                            to="/how-it-works"
+                            className="inline-flex items-center rounded-md border border-white/40 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white hover:bg-white/20"
+                          >
+                            How it works
+                          </Link>
+                          <a
+                            href="https://app.eanrunner.com/"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center rounded-md border border-white/40 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white hover:bg-white/20"
+                          >
+                            Login
+                          </a>
+                        </div>
+                      </div>
+                    </article>
+                  ) : null;
 
                   return (
                   <section key={group.brand} className="space-y-2">
@@ -1561,75 +1851,7 @@ function App() {
                           eagerImage={groupIndex === 0 && index < ABOVE_THE_FOLD_PRIORITY_COUNT}
                         />
                       ))}
-                      {showIntroTile && (
-                        <article
-                          className="relative h-[330px] overflow-hidden rounded-lg border border-[hsl(221_70%_24%)] p-4 text-white shadow-[0_8px_24px_rgb(10_24_64/0.28)]"
-                          style={{ gridColumn: `span ${introTileSpan} / span ${introTileSpan}` }}
-                        >
-                          <div
-                            className="absolute inset-0"
-                            aria-hidden="true"
-                            style={{
-                              backgroundImage: [
-                                'linear-gradient(135deg, hsl(225 92% 16%) 0%, hsl(228 88% 14%) 45%, hsl(233 78% 23%) 100%)',
-                                'radial-gradient(120% 100% at 88% -8%, rgba(72, 96, 255, 0.28) 0%, rgba(72, 96, 255, 0) 58%)',
-                                'repeating-linear-gradient(90deg, rgba(255,255,255,0.07) 0 1px, rgba(255,255,255,0) 1px 28px)',
-                              ].join(','),
-                            }}
-                          />
-                          <div className="intro-bigmark" aria-hidden="true">
-                            <span className="intro-bigmark__bar intro-bigmark__bar--1" />
-                            <span className="intro-bigmark__bar intro-bigmark__bar--2" />
-                            <span className="intro-bigmark__bar intro-bigmark__bar--3" />
-                          </div>
-                          <div className="relative z-10 flex h-full flex-col pb-11">
-                          <button
-                            type="button"
-                            onClick={() => setShowIntroCard(false)}
-                            className="absolute right-0 top-0 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:bg-white/20"
-                            aria-label="Close introduction"
-                            title="Close"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-
-                          <img
-                            src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/logo-ean.png"
-                            alt="EANrunner"
-                            className="h-6 w-auto self-start object-contain brightness-0 invert"
-                          />
-
-                          <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9bb8ff]">Product data platform</p>
-                          <p className="mt-2 text-[20px] font-bold leading-[1.06] text-white sm:text-[24px] xl:text-[26px]">
-                            All supplier products,
-                            <br />
-                            one catalog,
-                            <br />
-                            <span className="text-[#a8caff]">priced for your market</span>
-                          </p>
-                          <p className="mt-3 max-w-[34ch] text-[12px] leading-relaxed text-white/80 sm:text-[13px]">
-                            Consolidated product data from European distributors, enriched,
-                            translated, and priced for your market, ready for your webshop.
-                          </p>
-                          <div className="absolute bottom-2 left-2.5 right-2.5 flex flex-wrap items-center gap-2">
-                            <Link
-                              to="/about-us"
-                              className="inline-flex items-center rounded-md border border-white/40 bg-white/10 px-1.5 py-1 text-[9px] font-semibold text-white hover:bg-white/20"
-                            >
-                              How it works
-                            </Link>
-                            <a
-                              href="https://app.eanrunner.com/"
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center rounded-md border border-white/40 bg-white/10 px-1.5 py-1 text-[9px] font-semibold text-white hover:bg-white/20"
-                            >
-                              Login
-                            </a>
-                          </div>
-                          </div>
-                        </article>
-                      )}
+                      {!isMobileViewport && introTile}
                     </div>
                   </section>
                   );
@@ -1650,7 +1872,7 @@ function App() {
                       </button>
                     </div>
 
-                    {brandGroups.length >= BRAND_CLUSTER_BRAND_BATCH && (
+                    {brandGroups.length >= BRAND_CLUSTER_BRAND_BATCH && !isMobileViewport && (
                       <div className="rounded-lg border border-[hsl(220_16%_90%)] bg-[hsl(220_22%_98%)] px-3 py-2">
                         <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[hsl(220_12%_48%)]">
                           Browse brands directly

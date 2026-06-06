@@ -28,7 +28,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'Which countries do you cover?',
     answer:
-      'We currently work with 15+ verified suppliers across Denmark, Sweden, Finland, Germany, and Poland. We are expanding to more EU markets soon.',
+      'We currently work with 8 verified suppliers across Denmark, Sweden, Finland, Germany, and Poland. We are expanding to more EU markets soon.',
   },
   {
     question: 'What platforms do you support?',
@@ -76,7 +76,7 @@ export default function ForRetailersPage() {
     };
   }, []);
 
-  const suppliersLabel = integratedSuppliers == null ? '...' : integratedSuppliers.toLocaleString('da-DK');
+  const suppliersLabel = Math.min(integratedSuppliers ?? 8, 8).toLocaleString('da-DK');
   const productsInStockLabel = inStockProducts == null ? '...' : inStockProducts.toLocaleString('da-DK');
 
   return (
@@ -128,19 +128,19 @@ export default function ForRetailersPage() {
         <section className="rounded-2xl border border-[hsl(220_16%_88%)] bg-[hsl(220_24%_98%)] px-4 py-5 sm:px-6">
           <div className="grid grid-cols-2 items-center gap-6 sm:grid-cols-3 lg:grid-cols-5">
             {LOGOS.map((logo) => (
-              <div key={logo.kind === 'image' ? logo.alt : logo.label} className="flex h-10 items-center justify-center">
+              <div key={logo.kind === 'image' ? logo.alt : logo.label} className="flex h-12 items-center justify-center">
                 {logo.kind === 'image' && (
                   <img src={logo.src} alt={logo.alt} className="max-h-8 w-auto object-contain opacity-90" />
                 )}
                 {logo.kind === 'badge' && (
-                  <span className="inline-flex items-center gap-2 rounded-md border border-[hsl(220_16%_84%)] bg-white px-2.5 py-1.5 text-[11px] font-medium text-[hsl(222_47%_18%)]">
-                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-[4px] bg-[hsl(221_92%_55%)] text-[9px] font-bold text-white">QB</span>
+                  <span className="inline-flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em] text-[hsl(222_47%_20%)] sm:text-[17px]">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-[5px] bg-[hsl(221_92%_55%)] text-[9px] font-bold text-white">QB</span>
                     {logo.label}
                   </span>
                 )}
                 {logo.kind === 'iconText' && (
-                  <span className="inline-flex items-center gap-2 rounded-md border border-[hsl(220_16%_84%)] bg-white px-2.5 py-1.5 text-[11px] font-medium text-[hsl(222_47%_18%)]">
-                    <img src={logo.src} alt={logo.alt} className="h-4 w-4" />
+                  <span className="inline-flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em] text-[hsl(222_47%_20%)] sm:text-[17px]">
+                    <img src={logo.src} alt={logo.alt} className="h-5 w-5" />
                     {logo.label}
                   </span>
                 )}
