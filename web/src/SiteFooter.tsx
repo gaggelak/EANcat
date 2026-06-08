@@ -11,7 +11,7 @@ export default function SiteFooter({ className = 'mt-10' }: SiteFooterProps) {
         <div className="grid gap-6 lg:grid-cols-12">
           <section className="space-y-2 lg:col-span-5">
             <img
-              src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/logo-ean.png"
+              src="/marketing/logo-ean.png"
               alt="EANrunner"
               className="h-6 w-auto object-contain"
             />

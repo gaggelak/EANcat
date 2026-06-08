@@ -2,22 +2,30 @@ import { useEffect, useState } from 'react';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
 import { getCatalogStats } from './api';
+import { useDocumentMeta } from './useDocumentMeta';
 
 const LOGOS = [
-  { kind: 'image' as const, src: 'https://www.eanrunner.com/sites/eanrunner.com/assets/img/logos/magento.png', alt: 'Magento logo' },
-  { kind: 'image' as const, src: 'https://www.eanrunner.com/sites/eanrunner.com/assets/img/logos/shopify.png', alt: 'Shopify logo' },
-  { kind: 'image' as const, src: 'https://www.eanrunner.com/sites/eanrunner.com/assets/img/logos/woocommerce.png', alt: 'WooCommerce logo' },
+  { kind: 'image' as const, src: '/marketing/logos/magento.png', alt: 'Magento logo' },
+  { kind: 'image' as const, src: '/marketing/logos/shopify.png', alt: 'Shopify logo' },
+  { kind: 'image' as const, src: '/marketing/logos/woocommerce.png', alt: 'WooCommerce logo' },
   { kind: 'badge' as const, label: 'Quickbutik' },
   { kind: 'iconText' as const, src: 'https://cdn.simpleicons.org/googlebigquery/669DF6', alt: 'BigQuery logo', label: 'BigQuery' },
 ];
 
 const MATCH_IMAGES = [
-  'https://www.eanrunner.com/sites/eanrunner.com/assets/img/product-1.png',
-  'https://www.eanrunner.com/sites/eanrunner.com/assets/img/product-2.png',
-  'https://www.eanrunner.com/sites/eanrunner.com/assets/img/product-3.png',
+  '/marketing/product-1.png',
+  '/marketing/product-2.png',
+  '/marketing/product-3.png',
 ];
 
 export default function ForRetailersPage() {
+  useDocumentMeta({
+    title: 'For Retailers',
+    description:
+      'Expand your shop and sell more products. Access 100,000+ dropshipping & cross-docking products with the highest margins, and push them live in minutes.',
+    path: '/for-retailers',
+  });
+
   const [inStockProducts, setInStockProducts] = useState<number | null>(null);
   const [integratedSuppliers, setIntegratedSuppliers] = useState<number | null>(null);
 
@@ -72,7 +80,7 @@ export default function ForRetailersPage() {
 
           <div className="overflow-hidden rounded-xl border border-[hsl(220_16%_88%)] bg-white p-3">
             <img
-              src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/shop-hero.png"
+              src="/marketing/shop-hero.png"
               alt="EANrunner shop hero"
               className="w-full rounded-lg object-cover"
             />
@@ -131,7 +139,7 @@ export default function ForRetailersPage() {
           </div>
           <div className="order-1 lg:order-2">
             <img
-              src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/shop-1.png"
+              src="/marketing/shop-1.png"
               alt="Supplier selection"
               className="h-full min-h-[290px] w-full rounded-lg object-cover"
             />
@@ -154,7 +162,7 @@ export default function ForRetailersPage() {
           </div>
           <div>
             <img
-              src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/shop-2.png"
+              src="/marketing/shop-2.png"
               alt="High-margin products"
               className="h-full min-h-[290px] w-full rounded-lg object-cover"
             />
@@ -177,7 +185,7 @@ export default function ForRetailersPage() {
           </div>
           <div className="order-1 lg:order-2">
             <img
-              src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/shop-3.png"
+              src="/marketing/shop-3.png"
               alt="Push live"
               className="h-full min-h-[290px] w-full rounded-lg object-cover"
             />

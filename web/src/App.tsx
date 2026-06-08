@@ -4,6 +4,7 @@ import { ExternalLink, Filter, Loader2, Menu, Search, X } from 'lucide-react';
 import { getBrandClusters, getCategories, getProducts, getSearchSuggestions } from './api';
 import type { BrandClusterGroup, CategoryEntry, PublicProduct, SearchSuggestion } from './types';
 import SiteFooter from './SiteFooter';
+import { useDocumentMeta } from './useDocumentMeta';
 
 const PAGE_SIZE = 48;
 const MULTI_FILTER_PAGE_SIZE = 200;
@@ -394,6 +395,23 @@ function App() {
       return brandParam;
     }
   }, [brandParam]);
+
+  useDocumentMeta(
+    decodedRouteBrand
+      ? {
+          title: `${decodedRouteBrand} products`,
+          description: `Browse ${decodedRouteBrand} products in the EANrunner catalogue — enriched product data, live stock, and competitive wholesale prices across Europe.`,
+          path: `/brand/${encodeURIComponent(decodedRouteBrand)}`,
+        }
+      : {
+          title: 'EANrunner — The catalogue',
+          rawTitle: true,
+          description:
+            'Browse 100,000+ products with enriched data, live stock, and competitive wholesale prices from reliable European distributors.',
+          path: '/',
+        },
+  );
+
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1280 : window.innerWidth));
   const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
@@ -1223,7 +1241,7 @@ function App() {
                   className="inline-flex h-9 shrink-0 items-center px-0.5"
                 >
                   <img
-                    src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/logo-ean.png"
+                    src="/marketing/logo-ean.png"
                     alt="EANrunner"
                     className="h-6 w-auto object-contain"
                   />
@@ -1732,7 +1750,7 @@ function App() {
                       </button>
 
                       <img
-                        src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/logo-ean.png"
+                        src="/marketing/logo-ean.png"
                         alt="EANrunner"
                         className="h-6 w-auto self-start object-contain brightness-0 invert"
                       />
@@ -1803,7 +1821,7 @@ function App() {
                         </button>
 
                         <img
-                          src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/logo-ean.png"
+                          src="/marketing/logo-ean.png"
                           alt="EANrunner"
                           className="h-6 w-auto self-start object-contain brightness-0 invert"
                         />

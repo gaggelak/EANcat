@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
+import { useDocumentMeta } from './useDocumentMeta';
 
 type FormState = {
   firstName: string;
@@ -24,6 +25,13 @@ const INITIAL_FORM: FormState = {
 };
 
 export default function GetApprovedPage() {
+  useDocumentMeta({
+    title: 'Get approved',
+    description:
+      'Request access to EANrunner. Fill out the form and we will help you get started serving more products in your shop.',
+    path: '/get-approved',
+  });
+
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [submitted, setSubmitted] = useState(false);
 

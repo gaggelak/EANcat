@@ -3,8 +3,16 @@ import { CalendarDays } from 'lucide-react';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
 import { getSortedBlogPosts } from './blogPosts';
+import { useDocumentMeta } from './useDocumentMeta';
 
 export default function BlogPage() {
+  useDocumentMeta({
+    title: 'Blog',
+    description:
+      'News and updates from EANrunner — product launches, milestones, and practical learnings from building structured cross-border commerce.',
+    path: '/blog',
+  });
+
   const sortedFeedItems = getSortedBlogPosts();
 
   return (

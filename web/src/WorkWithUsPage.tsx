@@ -14,8 +14,16 @@ import {
 import { Link } from 'react-router-dom';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
+import { useDocumentMeta } from './useDocumentMeta';
 
 export default function WorkWithUsPage() {
+  useDocumentMeta({
+    title: 'Small team. Big network.',
+    description:
+      'Work with EANrunner. We connect retailers, distributors, and brands across Europe through structured product data and automation.',
+    path: '/work-with-us',
+  });
+
   const partnerTypes = [
     {
       title: 'Retailers',

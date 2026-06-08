@@ -11,7 +11,35 @@
         <!-- Warm up API connection used for initial catalog requests. -->
         <link rel="preconnect" href="https://eancat-api.wonderfulcliff-a6d449df.swedencentral.azurecontainerapps.io" crossorigin />
         <link rel="dns-prefetch" href="https://eancat-api.wonderfulcliff-a6d449df.swedencentral.azurecontainerapps.io" />
-    <title>EANrunner - The catalogue</title>
+
+    <!-- Site-wide SEO defaults. Per-route titles/descriptions are refined
+         client-side by useDocumentMeta for crawlers that execute JS (Googlebot).
+         These static defaults are what non-JS social scrapers (LinkedIn, Slack,
+         Facebook) read. Canonical host is the apex eanrunner.com. -->
+    <title>EANrunner — The catalogue</title>
+    <meta
+      name="description"
+      content="Browse 100,000+ products with enriched data, live stock, and competitive wholesale prices from reliable European distributors."
+    />
+    <link rel="canonical" href="https://eanrunner.com/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="EANrunner" />
+    <meta property="og:title" content="EANrunner — The catalogue" />
+    <meta
+      property="og:description"
+      content="Browse 100,000+ products with enriched data, live stock, and competitive wholesale prices from reliable European distributors."
+    />
+    <meta property="og:url" content="https://eanrunner.com/" />
+    <meta property="og:image" content="https://eanrunner.com/marketing/logo-ean.png" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="EANrunner — The catalogue" />
+    <meta
+      name="twitter:description"
+      content="Browse 100,000+ products with enriched data, live stock, and competitive wholesale prices from reliable European distributors."
+    />
+    <meta name="twitter:image" content="https://eanrunner.com/marketing/logo-ean.png" />
   </head>
   <body>
     <div id="root"></div>
