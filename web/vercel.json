@@ -1,3 +1,7 @@
 {
+  "redirects": [
+    { "source": "/for-shops", "destination": "/for-retailers", "permanent": true },
+    { "source": "/about", "destination": "/about-us", "permanent": true }
+  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
