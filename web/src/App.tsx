@@ -16,7 +16,7 @@ const BRAND_CLUSTER_REQUEST_TIMEOUT_MS = 7000;
 const ABOVE_THE_FOLD_PRIORITY_COUNT = 8;
 const FILTER_OPTIONS_CACHE_KEY = 'webversion.filter-options.cache.v2';
 const FILTER_OPTIONS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const HOME_CATALOG_CACHE_KEY = 'webversion.home-catalog.cache.v1';
+const HOME_CATALOG_CACHE_KEY = 'webversion.home-catalog.cache.v4';
 const HOME_CATALOG_CACHE_TTL_MS = 60 * 60 * 1000;
 const URL_ALLOWED_GRADES = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'N/A']);
 
@@ -455,6 +455,8 @@ function App() {
   const pageSize = shouldUseCompactPreviewPageSize ? compactPreviewPageSize : defaultListPageSize;
   const compactBrandPreviewCount = getCompactBrandPreviewCountForWidth(viewportWidth);
   const isMobileViewport = viewportWidth < 768;
+  const mobileBrandRailProductCount = 9;
+  const brandClusterPerBrandLimit = isMobileViewport ? mobileBrandRailProductCount : compactBrandPreviewCount;
   const shouldClusterByBrand = isCompactVersion
     && viewMode === 'grid'
     && selectedCategoryValues.length === 0
@@ -690,15 +692,17 @@ function App() {
       if (canUseHomeCatalogCache) {
         const clusterCacheKey = getHomeCatalogCacheKey('clusters', {
           market,
-          previewCount: compactBrandPreviewCount,
+          previewCount: brandClusterPerBrandLimit,
         });
         const productCacheKey = getHomeCatalogCacheKey('products', {
           market,
           limit: Math.max(listVisibleLimit, pageSize),
         });
         const cached = loadHomeCatalogCache(shouldClusterByBrand ? clusterCacheKey : productCacheKey);
+        const shouldUseCached = cached
+          && (cached.mode !== 'clusters' || cached.brandClusterGroups.length > 0 || cached.totalBrands === 0);
 
-        if (cached) {
+        if (shouldUseCached) {
           setError('');
           setHasLoadedTotalProducts(true);
 
@@ -732,7 +736,7 @@ function App() {
                 market,
                 brandClusterOffset,
                 BRAND_CLUSTER_BRAND_BATCH,
-                compactBrandPreviewCount,
+                brandClusterPerBrandLimit,
                 BRAND_CLUSTER_MIN_PRODUCTS,
                 selectedCategory || undefined,
                 selectedGrades.size > 0 ? selectedGrades : undefined,
@@ -744,6 +748,9 @@ function App() {
             );
 
             if (!active) return;
+            if (brandClusterOffset === 0 && clusterData.totalBrands > 0 && clusterData.brands.length === 0) {
+              throw new Error('Empty cluster payload for non-empty catalog');
+            }
             setDisableBrandClusters(false);
             setBrandClusterGroups((prev) => (brandClusterOffset === 0 ? clusterData.brands : [...prev, ...clusterData.brands]));
             setBrandClusterTotalBrands(clusterData.totalBrands);
@@ -757,7 +764,7 @@ function App() {
                 mode: 'clusters',
                 cacheKey: getHomeCatalogCacheKey('clusters', {
                   market,
-                  previewCount: compactBrandPreviewCount,
+                  previewCount: brandClusterPerBrandLimit,
                 }),
                 brandClusterGroups: clusterData.brands,
                 totalProducts: clusterData.totalProducts,
@@ -841,6 +848,7 @@ function App() {
     shouldClusterByBrand,
     pageSize,
     compactBrandPreviewCount,
+    brandClusterPerBrandLimit,
   ]);
 
   // Reset to page 1 when filters change
@@ -984,7 +992,18 @@ function App() {
     if (market !== 'dk') {
       chips.push({ key: 'market', label: `Market: ${market.toUpperCase()}`, clear: () => setMarket('dk') });
     }
-    if (inStockOnly) {
+    const isDefaultFrontPageState = isCompactVersion
+      && !decodedRouteBrand.trim()
+      && inStockOnly
+      && !hasPictureOnly
+      && market === 'dk'
+      && !keyword.trim()
+      && selectedCategoryValues.length === 0
+      && selectedBrandValues.length === 0
+      && selectedGrades.size === 0
+      && selectedCompetitionLevels.size === 0;
+
+    if (inStockOnly && !isDefaultFrontPageState) {
       chips.push({ key: 'stock', label: 'In stock only', clear: () => setInStockOnly(false) });
     }
     if (hasPictureOnly) {
@@ -1016,7 +1035,18 @@ function App() {
     }
 
     return chips;
-  }, [selectedBrandValues, selectedCategoryValues, keyword, market, inStockOnly, hasPictureOnly, selectedGrades, selectedCompetitionLevels]);
+  }, [
+    selectedBrandValues,
+    selectedCategoryValues,
+    keyword,
+    market,
+    inStockOnly,
+    hasPictureOnly,
+    selectedGrades,
+    selectedCompetitionLevels,
+    isCompactVersion,
+    decodedRouteBrand,
+  ]);
 
   const searchPlaceholder = hasLoadedTotalProducts
     ? `Search EAN, Title, MPN of ${totalProducts.toLocaleString()} products`
@@ -1190,7 +1220,7 @@ function App() {
                 <button
                   type="button"
                   onClick={goToHomeFrontPage}
-                  className="inline-flex h-9 items-center px-0.5"
+                  className="inline-flex h-9 shrink-0 items-center px-0.5"
                 >
                   <img
                     src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/logo-ean.png"
@@ -1199,7 +1229,12 @@ function App() {
                   />
                 </button>
 
-                <div ref={searchBoxRef} className="relative flex min-h-9 min-w-[260px] flex-1 flex-wrap items-center gap-1 rounded-lg border border-[hsl(220_14%_89%)] bg-white px-2 py-1">
+                <div
+                  ref={searchBoxRef}
+                  className={`relative flex min-h-9 flex-1 flex-wrap items-center gap-1 rounded-lg border border-[hsl(220_14%_89%)] bg-white px-2 py-1 ${
+                    isMobileViewport ? 'order-2 basis-full min-w-0' : 'min-w-[260px]'
+                  }`}
+                >
                   <div className="flex min-w-0 flex-1 items-center">
                     <Search className="h-3.5 w-3.5 shrink-0 text-[hsl(220_12%_55%)]" />
                     <input
@@ -1252,19 +1287,19 @@ function App() {
                     <Filter className="mr-1 h-3 w-3" />
                     Filters
                   </button>
-                  <div className="inline-flex h-7 shrink-0 items-center overflow-hidden rounded-md border border-[hsl(220_16%_84%)] bg-white">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('grid')}
-                      className={`h-full px-2 text-[10px] font-semibold ${
-                        viewMode === 'grid'
-                          ? 'bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
-                          : 'text-[hsl(220_12%_45%)] hover:bg-[hsl(220_18%_95%)]'
-                      }`}
-                    >
-                      Pictures
-                    </button>
-                    {!isMobileViewport && (
+                  {!isMobileViewport && (
+                    <div className="inline-flex h-7 shrink-0 items-center overflow-hidden rounded-md border border-[hsl(220_16%_84%)] bg-white">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('grid')}
+                        className={`h-full px-2 text-[10px] font-semibold ${
+                          viewMode === 'grid'
+                            ? 'bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
+                            : 'text-[hsl(220_12%_45%)] hover:bg-[hsl(220_18%_95%)]'
+                        }`}
+                      >
+                        Pictures
+                      </button>
                       <button
                         type="button"
                         onClick={() => setViewMode('list')}
@@ -1276,8 +1311,8 @@ function App() {
                       >
                         List
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   {loading ? (
                     <span className="inline-flex h-7 shrink-0 items-center rounded-md border border-[hsl(221_72%_72%)] bg-[hsl(221_84%_95%)] px-2 text-[10px] font-semibold text-[hsl(221_72%_32%)]">
                       Loading results...
@@ -1322,7 +1357,7 @@ function App() {
                   )}
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-[hsl(220_12%_50%)]">
+                <div className={`flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-[hsl(220_12%_50%)] ${isMobileViewport ? 'order-1 ml-auto' : ''}`}>
                   {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin text-[hsl(220_16%_40%)]" /> : null}
                   {!isMobileViewport && (
                     <a
@@ -1722,14 +1757,6 @@ function App() {
                         >
                           How it works
                         </Link>
-                        <a
-                          href="https://app.eanrunner.com/"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center rounded-md border border-white/40 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white hover:bg-white/20"
-                        >
-                          Login
-                        </a>
                       </div>
                     </div>
                   </article>
@@ -1801,58 +1828,92 @@ function App() {
                           >
                             How it works
                           </Link>
-                          <a
-                            href="https://app.eanrunner.com/"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center rounded-md border border-white/40 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white hover:bg-white/20"
-                          >
-                            Login
-                          </a>
                         </div>
                       </div>
                     </article>
                   ) : null;
+                  const mobileBrandRailItems = group.items.slice(0, mobileBrandRailProductCount);
 
                   return (
                   <section key={group.brand} className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[hsl(220_14%_89%)] bg-white px-3 py-2">
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-[hsl(222_47%_8%)] truncate">
+                        <button
+                          type="button"
+                          className="block w-full truncate text-left text-sm font-semibold text-[hsl(222_47%_8%)] hover:text-[hsl(221_72%_32%)]"
+                          onClick={() => {
+                            setBrandFilter(group.brand);
+                            setInStockOnly(false);
+                            setHasPictureOnly(false);
+                            setFiltersOpen(false);
+                            setPage(1);
+                          }}
+                        >
                           {group.brand}{' '}
                           <span className="text-[11px] font-medium text-[hsl(220_12%_45%)]">
                             ({group.totalProducts.toLocaleString()} products)
                           </span>
+                        </button>
+                      </div>
+                      {!isMobileViewport && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center rounded-md bg-[hsl(221_92%_55%)] px-3 py-1.5 text-[10px] font-semibold text-white hover:brightness-95"
+                          onClick={() => {
+                            setBrandFilter(group.brand);
+                            setInStockOnly(false);
+                            setHasPictureOnly(false);
+                            setFiltersOpen(false);
+                            setPage(1);
+                          }}
+                        >
+                          See all products from {group.brand} here
+                        </button>
+                      )}
+                    </div>
+                    {isMobileViewport ? (
+                      <div className="-mx-1 flex items-stretch snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1" aria-label={`${group.brand} products`}>
+                        {mobileBrandRailItems.map((product, index) => (
+                          <div key={product.ean} className="flex w-[156px] shrink-0 snap-start [&>div]:h-full [&>div]:w-full">
+                            <ProductCard
+                              product={product}
+                              compact
+                              eagerImage={groupIndex === 0 && index < ABOVE_THE_FOLD_PRIORITY_COUNT}
+                            />
+                          </div>
+                        ))}
+                        <div className="flex w-[156px] shrink-0 snap-start">
+                          <button
+                            type="button"
+                            className="flex h-full w-full items-center justify-center rounded-lg border border-[hsl(221_72%_72%)] bg-[hsl(221_84%_95%)] px-3 text-center text-[11px] font-semibold text-[hsl(221_72%_32%)] hover:bg-[hsl(221_80%_92%)]"
+                            onClick={() => {
+                              setBrandFilter(group.brand);
+                              setInStockOnly(false);
+                              setHasPictureOnly(false);
+                              setFiltersOpen(false);
+                              setPage(1);
+                            }}
+                          >
+                            See all products from {group.brand} here
+                          </button>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        className="inline-flex items-center rounded-md bg-[hsl(221_92%_55%)] px-3 py-1.5 text-[10px] font-semibold text-white hover:brightness-95"
-                        onClick={() => {
-                          setBrandFilter(group.brand);
-                          setInStockOnly(false);
-                          setHasPictureOnly(false);
-                          setFiltersOpen(false);
-                          setPage(1);
-                        }}
+                    ) : (
+                      <div
+                        className="grid gap-2"
+                        style={{ gridTemplateColumns: `repeat(${compactBrandPreviewCount}, minmax(0, 1fr))` }}
                       >
-                        See all products from {group.brand} here
-                      </button>
-                    </div>
-                    <div
-                      className="grid gap-2"
-                      style={{ gridTemplateColumns: `repeat(${compactBrandPreviewCount}, minmax(0, 1fr))` }}
-                    >
-                      {group.items.slice(0, previewLimit).map((product, index) => (
-                        <ProductCard
-                          key={product.ean}
-                          product={product}
-                          compact
-                          eagerImage={groupIndex === 0 && index < ABOVE_THE_FOLD_PRIORITY_COUNT}
-                        />
-                      ))}
-                      {!isMobileViewport && introTile}
-                    </div>
+                        {group.items.slice(0, previewLimit).map((product, index) => (
+                          <ProductCard
+                            key={product.ean}
+                            product={product}
+                            compact
+                            eagerImage={groupIndex === 0 && index < ABOVE_THE_FOLD_PRIORITY_COUNT}
+                          />
+                        ))}
+                        {introTile}
+                      </div>
+                    )}
                   </section>
                   );
                 })}
@@ -1910,7 +1971,7 @@ function App() {
                 )}
 
                 {viewMode === 'grid' ? (
-                  <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
+                  <div className={`grid gap-2 ${isMobileViewport && (decodedRouteBrand.trim() || selectedBrandValues.length > 0) ? 'grid-cols-2' : '[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]'}`}>
                     {visibleProducts.map((product, index) => (
                       <ProductCard
                         key={product.ean}

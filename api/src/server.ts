@@ -537,9 +537,9 @@ async function main(): Promise<void> {
     try {
       const pool = await getPool();
 
-      // filtered_products is the public-safe row set; everything downstream
-      // (ranking, brand selection) operates on these rows.
-      const buildFiltered = (request: sql.Request): string => {
+      // Base filter keeps semantic filters (query/category). Stock/image are
+      // applied only for preview items so brand totals can represent the wider set.
+      const buildBaseFiltered = (request: sql.Request): string => {
         const conditions: string[] = [];
         if (rawQuery) {
           request.input('query', sql.NVarChar, `%${rawQuery}%`);
@@ -549,10 +549,14 @@ async function main(): Promise<void> {
           request.input('category', sql.NVarChar, rawCategory);
           conditions.push('category = @category');
         }
-        if (parsed.data.inStock === 'true') conditions.push(`${m.inStock} = 1`);
-        if (parsed.data.hasImage === 'true') conditions.push('has_image = 1');
         return conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
       };
+
+      const previewWhereClause = [
+        parsed.data.inStock === 'true' ? 'in_stock = 1' : '',
+        parsed.data.hasImage === 'true' ? 'has_image = 1' : '',
+      ].filter(Boolean).join(' AND ');
+      const previewWhereSql = previewWhereClause ? `WHERE ${previewWhereClause}` : '';
 
       const filteredCte = (whereClause: string) => `
         filtered_products AS (
@@ -574,15 +578,16 @@ async function main(): Promise<void> {
       // Count eligible products + brands.
       const countRequest = pool.request();
       countRequest.input('minBrandProducts', sql.Int, minBrandProducts);
-      const countWhere = buildFiltered(countRequest);
+      const countWhere = buildBaseFiltered(countRequest);
       const countResult = await countRequest.query(`
         WITH ${filteredCte(countWhere)},
         graded AS ( SELECT * FROM filtered_products ${gradeWhereClause} ),
+        preview AS ( SELECT * FROM graded ${previewWhereSql} ),
         eligible_brands AS (
-          SELECT brand FROM graded GROUP BY brand HAVING COUNT(*) >= @minBrandProducts
+          SELECT brand FROM preview GROUP BY brand HAVING COUNT(*) >= @minBrandProducts
         )
-        SELECT COUNT(*) AS totalProducts, COUNT(DISTINCT g.brand) AS totalBrands
-        FROM graded g INNER JOIN eligible_brands eb ON eb.brand = g.brand
+        SELECT COUNT(*) AS totalProducts, COUNT(DISTINCT p.brand) AS totalBrands
+        FROM preview p INNER JOIN eligible_brands eb ON eb.brand = p.brand
       `);
       const totalProducts = countResult.recordset[0]?.totalProducts ?? 0;
       const totalBrands = countResult.recordset[0]?.totalBrands ?? 0;
@@ -593,32 +598,39 @@ async function main(): Promise<void> {
       dataRequest.input('brandLimit', sql.Int, brandLimit);
       dataRequest.input('perBrandLimit', sql.Int, perBrandLimit);
       dataRequest.input('minBrandProducts', sql.Int, minBrandProducts);
-      const dataWhere = buildFiltered(dataRequest);
+      const dataWhere = buildBaseFiltered(dataRequest);
       const dataResult = await dataRequest.query(`
         WITH ${filteredCte(dataWhere)},
         graded AS ( SELECT * FROM filtered_products ${gradeWhereClause} ),
+        brand_totals AS (
+          SELECT brand, COUNT(*) AS brand_total_count
+          FROM graded
+          GROUP BY brand
+        ),
+        preview AS ( SELECT * FROM graded ${previewWhereSql} ),
         ranked AS (
-          SELECT g.*,
-            ROW_NUMBER() OVER (PARTITION BY g.brand ORDER BY g.updated_at DESC, g.ean ASC) AS brand_item_rank,
-            MAX(g.updated_at) OVER (PARTITION BY g.brand) AS brand_latest_added,
-            COUNT(*) OVER (PARTITION BY g.brand) AS brand_product_count
-          FROM graded g
+          SELECT p.*,
+            ROW_NUMBER() OVER (PARTITION BY p.brand ORDER BY p.updated_at DESC, p.ean ASC) AS brand_item_rank,
+            MAX(p.updated_at) OVER (PARTITION BY p.brand) AS brand_latest_added,
+            COUNT(*) OVER (PARTITION BY p.brand) AS brand_preview_count
+          FROM preview p
         ),
         ranked_brands AS (
-          SELECT DISTINCT r.brand, r.brand_latest_added, r.brand_product_count,
+          SELECT DISTINCT r.brand, r.brand_latest_added, r.brand_preview_count,
             DENSE_RANK() OVER (ORDER BY r.brand_latest_added DESC, r.brand ASC) AS brand_rank
           FROM ranked r
-          WHERE r.brand_product_count >= @minBrandProducts
+          WHERE r.brand_preview_count >= @minBrandProducts
         ),
         selected_brands AS (
-          SELECT rb.brand, rb.brand_latest_added, rb.brand_product_count
+          SELECT rb.brand, rb.brand_latest_added, bt.brand_total_count
           FROM ranked_brands rb
+          INNER JOIN brand_totals bt ON bt.brand = rb.brand
           WHERE rb.brand_rank > @brandOffset AND rb.brand_rank <= (@brandOffset + @brandLimit)
         )
         SELECT
           r.ean, r.title, r.brand, r.category, r.image, r.has_image, r.updated_at,
           r.margin_grade, r.in_stock, r.competitor_count, r.market_price, r.market_currency, r.market_url,
-          sb.brand_latest_added, sb.brand_product_count
+          sb.brand_latest_added, sb.brand_total_count
         FROM ranked r
         INNER JOIN selected_brands sb ON sb.brand = r.brand
         WHERE r.brand_item_rank <= @perBrandLimit
@@ -626,13 +638,13 @@ async function main(): Promise<void> {
       `);
 
       const grouped = new Map<string, { brand: string; latestUpdatedAt: string | null; totalProducts: number; items: PublicProduct[] }>();
-      for (const row of dataResult.recordset as Array<ShowcaseRow & { brand_latest_added: Date | null; brand_product_count: number | null }>) {
+      for (const row of dataResult.recordset as Array<ShowcaseRow & { brand_latest_added: Date | null; brand_total_count: number | null }>) {
         const brand = row.brand || 'Unknown brand';
         if (!grouped.has(brand)) {
           grouped.set(brand, {
             brand,
             latestUpdatedAt: row.brand_latest_added ? new Date(row.brand_latest_added).toISOString() : null,
-            totalProducts: row.brand_product_count ?? 0,
+            totalProducts: row.brand_total_count ?? 0,
             items: [],
           });
         }
