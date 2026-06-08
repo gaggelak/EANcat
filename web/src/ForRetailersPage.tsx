@@ -1,41 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
 import { getCatalogStats } from './api';
-
-type FaqItem = {
-  question: string;
-  answer: string;
-};
-
-const FAQ_ITEMS: FaqItem[] = [
-  {
-    question: 'What is EANrunner?',
-    answer:
-      'EANrunner integrates EU distributors with local retailers by importing, enriching, and syncing product feeds into your store. We automate pricing, content, and order routing from warehouse to checkout.',
-  },
-  {
-    question: 'How does the pricing work?',
-    answer:
-      'There are no upfront costs or subscription fees for retailers. We earn a small commission from distributors on transactions, keeping the platform free for you.',
-  },
-  {
-    question: 'What types of products are available?',
-    answer:
-      'Our network includes electronics, home goods, sports equipment, toys, beauty products, and more. With 100,000+ products in stock across various categories, you will find what you need to expand your catalog.',
-  },
-  {
-    question: 'Which countries do you cover?',
-    answer:
-      'We currently work with 8 verified suppliers across Denmark, Sweden, Finland, Germany, and Poland. We are expanding to more EU markets soon.',
-  },
-  {
-    question: 'What platforms do you support?',
-    answer:
-      'We support custom integrations, Magento, Shopify, WooCommerce, and more.',
-  },
-];
 
 const LOGOS = [
   { kind: 'image' as const, src: 'https://www.eanrunner.com/sites/eanrunner.com/assets/img/logos/magento.png', alt: 'Magento logo' },
@@ -52,7 +18,6 @@ const MATCH_IMAGES = [
 ];
 
 export default function ForRetailersPage() {
-  const [openIndex, setOpenIndex] = useState<number>(0);
   const [inStockProducts, setInStockProducts] = useState<number | null>(null);
   const [integratedSuppliers, setIntegratedSuppliers] = useState<number | null>(null);
 
@@ -96,22 +61,13 @@ export default function ForRetailersPage() {
               <li>✓ Discover the products with the highest margins</li>
               <li>✓ Push products live in minutes through integrations</li>
             </ul>
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <a
-                href="/get-approved"
-                className="inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-[hsl(221_84%_95%)] px-4 py-2 text-sm font-semibold text-[hsl(221_72%_32%)] hover:brightness-95"
-              >
-                Get approved
+            <p className="mt-6 max-w-[56ch] rounded-md border border-[hsl(220_16%_84%)] bg-white px-4 py-3 text-sm font-medium text-[hsl(220_14%_28%)]">
+              Want access? Contact us at{' '}
+              <a href="mailto:info@eanrunner.com" className="font-semibold text-[hsl(221_92%_42%)] hover:underline">
+                info@eanrunner.com
               </a>
-              <a
-                href="https://www.eanrunner.com/free-trial"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-white px-4 py-2 text-sm font-semibold text-[hsl(222_47%_18%)] hover:bg-[hsl(220_18%_95%)]"
-              >
-                I want a free trial
-              </a>
-            </div>
+              {' '}and we will help you get started.
+            </p>
           </div>
 
           <div className="overflow-hidden rounded-xl border border-[hsl(220_16%_88%)] bg-white p-3">
@@ -172,12 +128,6 @@ export default function ForRetailersPage() {
               <li>✓ Easily enter into direct agreements</li>
               <li>✓ Everything is digitalized and can be managed in one place</li>
             </ul>
-            <a
-              href="/get-approved"
-              className="mt-5 inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-white px-3 py-1.5 text-xs font-semibold text-[hsl(220_24%_24%)] hover:bg-[hsl(220_18%_95%)]"
-            >
-              Get approved
-            </a>
           </div>
           <div className="order-1 lg:order-2">
             <img
@@ -201,12 +151,6 @@ export default function ForRetailersPage() {
               <li>✓ Find unique attractive opportunities</li>
               <li>✓ Filter based on price data, local data and more</li>
             </ul>
-            <a
-              href="/get-approved"
-              className="mt-5 inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-white px-3 py-1.5 text-xs font-semibold text-[hsl(220_24%_24%)] hover:bg-[hsl(220_18%_95%)]"
-            >
-              Get approved
-            </a>
           </div>
           <div>
             <img
@@ -230,12 +174,6 @@ export default function ForRetailersPage() {
               <li>✓ Push products and data into your shop with a click</li>
               <li>✓ Daily stock and pricing sync</li>
             </ul>
-            <a
-              href="/get-approved"
-              className="mt-5 inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-white px-3 py-1.5 text-xs font-semibold text-[hsl(220_24%_24%)] hover:bg-[hsl(220_18%_95%)]"
-            >
-              Get approved
-            </a>
           </div>
           <div className="order-1 lg:order-2">
             <img
@@ -275,36 +213,6 @@ export default function ForRetailersPage() {
               <p className="text-3xl font-bold text-[hsl(221_92%_45%)]">{productsInStockLabel}</p>
               <p className="mt-1 text-sm text-[hsl(220_12%_38%)]">Products in Stock</p>
             </div>
-          </div>
-        </section>
-
-        <div className="h-28" />
-
-        <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-          <div>
-            <h2 className="text-[32px] font-bold leading-tight">How does EANrunner work?</h2>
-            <p className="mt-3 text-[16px] text-[hsl(220_14%_34%)]">
-              Understand how EANrunner does the groundwork and you can expand your store with new dropshipping and cross-docking products.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            {FAQ_ITEMS.map((item, idx) => {
-              const open = openIndex === idx;
-              return (
-                <article key={item.question} className="overflow-hidden rounded-xl border border-[hsl(220_16%_88%)] bg-white">
-                  <button
-                    type="button"
-                    onClick={() => setOpenIndex(open ? -1 : idx)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-                  >
-                    <span className="text-sm font-semibold text-[hsl(222_47%_12%)]">{item.question}</span>
-                    <ChevronDown className={`h-4 w-4 text-[hsl(220_12%_48%)] transition-transform ${open ? 'rotate-180' : ''}`} />
-                  </button>
-                  {open && <p className="border-t border-[hsl(220_14%_91%)] px-4 py-3 text-sm leading-relaxed text-[hsl(220_12%_35%)]">{item.answer}</p>}
-                </article>
-              );
-            })}
           </div>
         </section>
 

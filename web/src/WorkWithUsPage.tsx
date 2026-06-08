@@ -121,7 +121,7 @@ export default function WorkWithUsPage() {
               </div>
               <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <a
-                  href="mailto:info@eanrunner.com"
+                  href="mailto:info@eanrunner.com?subject=EANrunner%20Partnership%20Inquiry"
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-[hsl(221_92%_55%)] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-16px_rgba(37,99,235,0.75)] hover:brightness-95 sm:w-auto"
                 >
                   <Mail className="h-4 w-4" />
@@ -141,18 +141,8 @@ export default function WorkWithUsPage() {
         <section className="mt-6">
           <div className="mb-4">
             <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_46%)]">We are activly looking for partners in these areas</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[hsl(220_14%_36%)]">
-              These are the kinds of partnerships we are actively looking for. Please contact us if you are in one of those areas.
-            </p>
           </div>
           <div className="overflow-hidden rounded-3xl border border-[hsl(220_16%_88%)] bg-white shadow-[0_10px_30px_-24px_rgba(15,23,42,0.22)]">
-            <div className="border-b border-[hsl(220_16%_90%)] bg-[linear-gradient(180deg,hsl(220_24%_99%)_0%,hsl(220_20%_97%)_100%)] px-5 py-4 sm:px-6">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_46%)]">Partnership board</p>
-                <p className="mt-1 text-sm text-[hsl(220_14%_36%)]">Role-based overview of the companies and operators we want to work with.</p>
-              </div>
-            </div>
-
             <div className="hidden md:grid md:grid-cols-[1.15fr_1fr_1.3fr] md:px-6 md:py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Role</p>
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Who is it for</p>
@@ -206,7 +196,7 @@ export default function WorkWithUsPage() {
             </div>
             <div className="flex flex-wrap gap-3">
               <a
-                href="mailto:info@eanrunner.com"
+                href="mailto:info@eanrunner.com?subject=EANrunner%20Partnership%20Inquiry"
                 className="inline-flex items-center rounded-xl bg-[hsl(221_92%_55%)] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-16px_rgba(37,99,235,0.75)] hover:brightness-95"
               >
                 info@eanrunner.com

@@ -1402,10 +1402,9 @@ function App() {
                             <div className="flex flex-col gap-1 text-[13px] leading-6">
                               <Link to="/for-retailers" className="hover:underline" onClick={() => setMenuOpen(false)}>For Retailers</Link>
                               <Link to="/for-distributors" className="hover:underline" onClick={() => setMenuOpen(false)}>For Distributors</Link>
-                              <Link to="/about-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Our story</Link>
+                              <Link to="/about-us" className="hover:underline" onClick={() => setMenuOpen(false)}>About us</Link>
                               <Link to="/how-it-works" className="hover:underline" onClick={() => setMenuOpen(false)}>How it works</Link>
                               <Link to="/work-with-us" className="hover:underline" onClick={() => setMenuOpen(false)}>Small team. Big network.</Link>
-                              <Link to="/blog" className="hover:underline" onClick={() => setMenuOpen(false)}>Blog</Link>
                             </div>
                           </section>
 
@@ -1971,7 +1970,7 @@ function App() {
                 )}
 
                 {viewMode === 'grid' ? (
-                  <div className={`grid gap-2 ${isMobileViewport && (decodedRouteBrand.trim() || selectedBrandValues.length > 0) ? 'grid-cols-2' : '[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]'}`}>
+                  <div className={`grid gap-2 ${isMobileViewport ? 'grid-cols-2' : '[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]'}`}>
                     {visibleProducts.map((product, index) => (
                       <ProductCard
                         key={product.ean}

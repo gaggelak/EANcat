@@ -6,6 +6,7 @@ import App from './App.tsx'
 import ScrollToTop from './ScrollToTop.tsx'
 
 const AboutUsPage = lazy(() => import('./AboutUsPage.tsx'))
+const HowItWorksPage = lazy(() => import('./HowItWorksPage.tsx'))
 const ProductDetailPage = lazy(() => import('./ProductDetailPage.tsx'))
 const WorkWithUsPage = lazy(() => import('./WorkWithUsPage.tsx'))
 const ForDistributorsPage = lazy(() => import('./ForDistributorsPage.tsx'))
@@ -23,7 +24,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/" element={<App />} />
           <Route path="/brand/:brandParam" element={<App />} />
           <Route path="/about-us" element={<AboutUsPage />} />
-          <Route path="/how-it-works" element={<AboutUsPage />} />
+          <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/for-retailers" element={<ForRetailersPage />} />
           <Route path="/for-distributors" element={<ForDistributorsPage />} />
           <Route path="/get-approved" element={<GetApprovedPage />} />

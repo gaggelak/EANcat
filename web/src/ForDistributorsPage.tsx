@@ -1,11 +1,8 @@
-import { Link } from 'react-router-dom';
 import { Layers, Users, Zap, Package } from 'lucide-react';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
 
 export default function ForDistributorsPage() {
-  const ctaHref = '/get-approved';
-
   return (
     <div className="min-h-screen bg-[#f8f6f3] text-[hsl(222_47%_10%)]">
       <PageTopBar />
@@ -25,6 +22,13 @@ export default function ForDistributorsPage() {
               <li>✓ Access our network of shops in Europe</li>
               <li>✓ Increase sell-through without expanding your sales team</li>
             </ul>
+            <p className="mt-6 max-w-[56ch] rounded-md border border-[hsl(220_16%_84%)] bg-white px-4 py-3 text-sm font-medium text-[hsl(220_14%_28%)]">
+              Want access? Contact us at{' '}
+              <a href="mailto:info@eanrunner.com" className="font-semibold text-[hsl(221_92%_42%)] hover:underline">
+                info@eanrunner.com
+              </a>
+              {' '}and we will help you get started.
+            </p>
           </div>
 
           <div className="relative overflow-hidden rounded-xl border border-[hsl(220_16%_86%)]">
@@ -36,12 +40,6 @@ export default function ForDistributorsPage() {
             />
             <div className="relative z-10 flex h-full min-h-[360px] flex-col justify-end p-6 text-white">
               <p className="text-[13px] font-medium text-white/80">Let&apos;s understand your needs</p>
-              <Link
-                to={ctaHref}
-                className="mt-3 inline-flex w-fit items-center rounded-md border border-white/45 bg-white/10 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-white/20"
-              >
-                Get approved
-              </Link>
             </div>
           </div>
         </section>
@@ -63,7 +61,6 @@ export default function ForDistributorsPage() {
               <li>✓ Include relevant data such as price, stock, images and more</li>
               <li>✓ We will clean the data and make it ready for the shops</li>
             </ul>
-            <Link to={ctaHref} className="mt-5 inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-white px-3 py-1.5 text-xs font-semibold text-[hsl(220_24%_24%)] hover:bg-[hsl(220_18%_95%)]">Get approved</Link>
           </div>
           <div className="order-1 lg:order-2">
             <img
@@ -85,7 +82,6 @@ export default function ForDistributorsPage() {
               <li>✓ Make direct agreements with the shops</li>
               <li>✓ Everything is digitalized and can be managed in one place</li>
             </ul>
-            <Link to={ctaHref} className="mt-5 inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-white px-3 py-1.5 text-xs font-semibold text-[hsl(220_24%_24%)] hover:bg-[hsl(220_18%_95%)]">Get approved</Link>
           </div>
           <div>
             <img
@@ -107,7 +103,6 @@ export default function ForDistributorsPage() {
               <li>✓ We enrich the product data and secure local translations</li>
               <li>✓ We make it easy for the shops to add new products to their store</li>
             </ul>
-            <Link to={ctaHref} className="mt-5 inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-white px-3 py-1.5 text-xs font-semibold text-[hsl(220_24%_24%)] hover:bg-[hsl(220_18%_95%)]">Get approved</Link>
           </div>
           <div className="order-1 lg:order-2">
             <img

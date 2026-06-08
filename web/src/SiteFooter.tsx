@@ -30,10 +30,9 @@ export default function SiteFooter({ className = 'mt-10' }: SiteFooterProps) {
             <div className="flex flex-col gap-1 text-[12px]">
               <Link to="/for-retailers" className="text-[hsl(221_92%_42%)] hover:underline">For Retailers</Link>
               <Link to="/for-distributors" className="text-[hsl(221_92%_42%)] hover:underline">For Distributors</Link>
-              <Link to="/about-us" className="text-[hsl(221_92%_42%)] hover:underline">Our story</Link>
+              <Link to="/about-us" className="text-[hsl(221_92%_42%)] hover:underline">About us</Link>
               <Link to="/how-it-works" className="text-[hsl(221_92%_42%)] hover:underline">How it works</Link>
               <Link to="/work-with-us" className="text-[hsl(221_92%_42%)] hover:underline">Small team. Big network.</Link>
-              <Link to="/blog" className="text-[hsl(221_92%_42%)] hover:underline">Blog (company posts and updates)</Link>
             </div>
           </section>
 
