@@ -3,8 +3,16 @@ import { ArrowLeft } from 'lucide-react';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
 import { getSortedBlogPosts } from './blogPosts';
+import { useDocumentMeta } from './useDocumentMeta';
 
 export default function AboutUsPage() {
+  useDocumentMeta({
+    title: 'About us',
+    description:
+      'EANrunner connects distributors and retailers with live, enriched product data and market-ready catalog automation. Meet the team behind it.',
+    path: '/about-us',
+  });
+
   const latestPosts = getSortedBlogPosts().slice(0, 4);
 
   return (

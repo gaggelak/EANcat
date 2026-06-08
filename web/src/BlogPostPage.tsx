@@ -2,10 +2,17 @@ import { Link, useParams } from 'react-router-dom';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
 import { getBlogPostBySlug } from './blogPosts';
+import { useDocumentMeta } from './useDocumentMeta';
 
 export default function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>();
   const post = slug ? getBlogPostBySlug(slug) : undefined;
+
+  useDocumentMeta({
+    title: post ? post.title : 'Blog',
+    description: post ? post.summary : 'Read the latest updates from EANrunner.',
+    path: post ? `/blog/${post.slug}` : '/blog',
+  });
 
   if (!post) {
     return (

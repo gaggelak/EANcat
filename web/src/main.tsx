@@ -14,6 +14,9 @@ const ForRetailersPage = lazy(() => import('./ForRetailersPage.tsx'))
 const GetApprovedPage = lazy(() => import('./GetApprovedPage.tsx'))
 const BlogPage = lazy(() => import('./BlogPage.tsx'))
 const BlogPostPage = lazy(() => import('./BlogPostPage.tsx'))
+const ContactPage = lazy(() => import('./ContactPage.tsx'))
+const PrivacyPolicyPage = lazy(() => import('./PrivacyPolicyPage.tsx'))
+const NotFoundPage = lazy(() => import('./NotFoundPage.tsx'))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -31,8 +34,11 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/work-with-us" element={<WorkWithUsPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/v3" element={<Navigate to="/" replace />} />
           <Route path="/product/:ean" element={<ProductDetailPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

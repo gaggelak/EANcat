@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
+import { useDocumentMeta } from './useDocumentMeta';
 
 type FaqItem = {
   question: string;
@@ -52,6 +53,13 @@ const STEPS = [
 ];
 
 export default function HowItWorksPage() {
+  useDocumentMeta({
+    title: 'How it works',
+    description:
+      'How EANrunner works: connect suppliers, find high-margin products with local price data, and push them live to your shop with daily stock and pricing sync.',
+    path: '/how-it-works',
+  });
+
   const [openIndex, setOpenIndex] = useState<number>(0);
 
   return (

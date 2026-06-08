@@ -1,8 +1,16 @@
 import { Layers, Users, Zap, Package } from 'lucide-react';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
+import { useDocumentMeta } from './useDocumentMeta';
 
 export default function ForDistributorsPage() {
+  useDocumentMeta({
+    title: 'For Distributors',
+    description:
+      'One connection, European reach. Connect your product data to EANrunner and access our network of shops across Europe to increase sell-through.',
+    path: '/for-distributors',
+  });
+
   return (
     <div className="min-h-screen bg-[#f8f6f3] text-[hsl(222_47%_10%)]">
       <PageTopBar />
@@ -35,7 +43,7 @@ export default function ForDistributorsPage() {
             <div
               className="absolute inset-0 bg-cover bg-center"
               style={{
-                backgroundImage: "linear-gradient(148deg, rgba(14,25,54,0.84), rgba(26,51,122,0.56)), url('https://www.eanrunner.com/sites/eanrunner.com/assets/img/distributor-mood.png')",
+                backgroundImage: "linear-gradient(148deg, rgba(14,25,54,0.84), rgba(26,51,122,0.56)), url('/marketing/distributor-mood.png')",
               }}
             />
             <div className="relative z-10 flex h-full min-h-[360px] flex-col justify-end p-6 text-white">
@@ -64,7 +72,7 @@ export default function ForDistributorsPage() {
           </div>
           <div className="order-1 lg:order-2">
             <img
-              src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/distributor-1.png"
+              src="/marketing/distributor-1.png"
               alt="Distributor workflow"
               className="h-full min-h-[290px] w-full rounded-lg object-cover"
             />
@@ -85,7 +93,7 @@ export default function ForDistributorsPage() {
           </div>
           <div>
             <img
-              src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/shop-2.png"
+              src="/marketing/shop-2.png"
               alt="Shops network"
               className="h-full min-h-[290px] w-full rounded-lg object-cover"
             />
@@ -106,7 +114,7 @@ export default function ForDistributorsPage() {
           </div>
           <div className="order-1 lg:order-2">
             <img
-              src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/distributor-2.png"
+              src="/marketing/distributor-2.png"
               alt="Distributor growth"
               className="h-full min-h-[290px] w-full rounded-lg object-cover"
             />

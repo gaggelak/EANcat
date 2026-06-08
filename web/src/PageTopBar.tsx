@@ -51,7 +51,7 @@ export default function PageTopBar() {
         <div className="flex flex-wrap items-center gap-1.5">
           <Link to="/" className="inline-flex h-9 shrink-0 items-center px-0.5">
             <img
-              src="https://www.eanrunner.com/sites/eanrunner.com/assets/img/logo-ean.png"
+              src="/marketing/logo-ean.png"
               alt="EANrunner"
               className="h-6 w-auto object-contain"
             />
