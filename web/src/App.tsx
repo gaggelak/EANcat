@@ -1,6 +1,6 @@
 ﻿import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ExternalLink, Filter, Loader2, Menu, Search, X } from 'lucide-react';
+import { Filter, Loader2, Menu, Search, X } from 'lucide-react';
 import { getBrandClusters, getCategories, getProducts, getSearchSuggestions } from './api';
 import type { BrandClusterGroup, CategoryEntry, PublicProduct, SearchSuggestion } from './types';
 import SiteFooter from './SiteFooter';
@@ -356,25 +356,6 @@ const ProductCard = memo(function ProductCard({
         <p className={`${compact ? 'text-[8px]' : 'text-[9px]'} text-[hsl(220_12%_45%)] font-medium whitespace-nowrap overflow-hidden text-ellipsis`}>
           Est. margin: <span className="text-[hsl(222_47%_20%)] font-semibold">{rangeLabel ?? 'Not available'}</span>
         </p>
-        <div className={`flex ${compact ? 'gap-1' : 'gap-1.5'} mt-auto`}>
-          {product.cheapestMarketLink ? (
-            <a
-              href={product.cheapestMarketLink}
-              target="_blank"
-              rel="noreferrer"
-              className={`w-full flex items-center justify-center gap-1 font-medium text-[hsl(221_92%_55%)] border border-[hsl(221_92%_55%)] rounded-md ${compact ? 'text-[9px] px-1.5 py-1' : 'text-[10px] px-2 py-1.5'} hover:bg-[hsl(221_80%_95%)] transition-colors`}
-            >
-              <ExternalLink className={`${compact ? 'w-2 h-2' : 'w-2.5 h-2.5'} shrink-0`} />
-              {product.marketPrice != null
-                ? (product.marketCurrency === 'DKK' || product.marketCurrency === 'SEK'
-                    ? `${Math.round(product.marketPrice)} ${product.marketCurrency === 'DKK' ? 'kr' : 'kr'}`
-                    : `€${product.marketPrice.toFixed(0)}`)
-                : 'Market'}
-            </a>
-          ) : (
-            <span className="flex-1" />
-          )}
-        </div>
       </div>
     </div>
   );
@@ -2010,7 +1991,6 @@ function App() {
                           <th className="px-3 py-2 font-semibold">Stock</th>
                           <th className="px-3 py-2 font-semibold">Competition</th>
                           <th className="px-3 py-2 font-semibold">Margin</th>
-                          <th className="px-3 py-2 font-semibold">Market</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2032,19 +2012,6 @@ function App() {
                                 <span className={hot.chiliColor}>{'🌶'.repeat(hot.chiliCount)}</span>
                               </td>
                               <td className="px-3 py-2">{rangeLabel ?? 'Not available'}</td>
-                              <td className="px-3 py-2">
-                                {product.cheapestMarketLink ? (
-                                  <a href={product.cheapestMarketLink} target="_blank" rel="noreferrer" className="font-medium text-[hsl(221_92%_45%)] hover:underline">
-                                    {product.marketPrice != null
-                                      ? (product.marketCurrency === 'DKK' || product.marketCurrency === 'SEK'
-                                          ? `${Math.round(product.marketPrice)} kr`
-                                          : `€${product.marketPrice.toFixed(0)}`)
-                                      : 'Open'}
-                                  </a>
-                                ) : (
-                                  <span className="text-[hsl(220_12%_50%)]">—</span>
-                                )}
-                              </td>
                             </tr>
                           );
                         })}

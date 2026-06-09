@@ -20,6 +20,7 @@ const BlogPage = lazy(() => import('./BlogPage.tsx'))
 const BlogPostPage = lazy(() => import('./BlogPostPage.tsx'))
 const ContactPage = lazy(() => import('./ContactPage.tsx'))
 const PrivacyPolicyPage = lazy(() => import('./PrivacyPolicyPage.tsx'))
+const InvestorDeckPage = lazy(() => import('./InvestorDeckPage.tsx'))
 const NotFoundPage = lazy(() => import('./NotFoundPage.tsx'))
 
 createRoot(document.getElementById('root')!).render(
@@ -44,6 +45,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/blog/:slug" element={<BlogPostPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/ir" element={<InvestorDeckPage />} />
+          <Route path="/ir-v2" element={<Navigate to="/ir" replace />} />
           <Route path="/v3" element={<Navigate to="/" replace />} />
           <Route path="/product/:ean" element={<ProductDetailPage />} />
           <Route path="*" element={<NotFoundPage />} />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Loader2, Package, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Loader2, Package } from 'lucide-react';
 import { getProductByEan } from './api';
 import type { MarginGrade, PublicProduct } from './types';
 import SiteFooter from './SiteFooter';
@@ -165,26 +165,6 @@ export default function ProductDetailPage() {
               {rangeLabel && <p className="text-xs font-medium text-[hsl(222_47%_20%)]">Est. margin: {rangeLabel}</p>}
             </div>
           </div>
-
-          {/* Market price + link */}
-          {product.marketPrice != null && (
-            <div className="rounded-lg border border-[hsl(220_14%_89%)] bg-white px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-[hsl(220_12%_55%)] font-semibold">Market price ({market.toUpperCase()})</p>
-              <p className="text-sm font-semibold text-[hsl(222_47%_8%)] mt-0.5">
-                {product.marketPrice.toLocaleString()} {product.marketCurrency ?? ''}
-              </p>
-              {product.cheapestMarketLink && (
-                <a
-                  href={product.cheapestMarketLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-[hsl(221_92%_55%)] hover:underline mt-1.5"
-                >
-                  View on market <ExternalLink className="w-3 h-3" />
-                </a>
-              )}
-            </div>
-          )}
 
           {product.category && (
             <div className="bg-white rounded-lg border border-[hsl(220_14%_89%)] px-3 py-2">
