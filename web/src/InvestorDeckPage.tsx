@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
 import { useDocumentMeta } from './useDocumentMeta';
 
 export default function InvestorDeckPage() {
   useDocumentMeta({
-    title: 'Investor page - slideshow',
-    description: 'EANrunner investor page in slideshow format with deck-style navigation.',
+    title: 'Investor Deck',
+    description: 'Explore the EANrunner investor deck, including market opportunity, traction, business model, and current fundraising details.',
     path: '/ir',
   });
 
@@ -19,7 +19,7 @@ export default function InvestorDeckPage() {
           <div className="flex h-full flex-col justify-between gap-6">
             <div className="space-y-6">
               <p className="text-[24px] font-medium leading-10 text-[hsl(214_100%_83%)]">
-                The biggest TAM that you ever will get a change to invest in
+                The biggest TAM that you ever will get a chance to invest in
               </p>
               <p className="text-[22px] leading-9 text-[hsl(214_40%_90%)]">
                 EANrunner helps suppliers and retailers turn product data into active sales channels.
@@ -291,6 +291,16 @@ export default function InvestorDeckPage() {
 
   const [activeSlide, setActiveSlide] = useState(0);
   const totalSlides = slides.length;
+  const mobileViewportRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const mobileContentRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [mobileScale, setMobileScale] = useState(1);
+  const deckBackground = {
+    backgroundImage: [
+      'radial-gradient(120% 120% at 80% 0%, rgba(84, 112, 255, 0.30) 0%, rgba(84, 112, 255, 0.0) 42%)',
+      'radial-gradient(120% 120% at 0% 100%, rgba(50, 88, 235, 0.24) 0%, rgba(50, 88, 235, 0.0) 40%)',
+      'linear-gradient(135deg, hsl(226 88% 14%) 0%, hsl(227 86% 12%) 46%, hsl(231 78% 19%) 100%)',
+    ].join(','),
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -306,6 +316,38 @@ export default function InvestorDeckPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [totalSlides]);
 
+  useEffect(() => {
+    const computeMobileScale = () => {
+      const slideScales = slides.map((_, index) => {
+        const viewport = mobileViewportRefs.current[index];
+        const content = mobileContentRefs.current[index];
+
+        if (!viewport || !content) {
+          return 1;
+        }
+
+        const availableHeight = viewport.clientHeight;
+        const naturalHeight = content.scrollHeight;
+
+        if (availableHeight <= 0 || naturalHeight <= 0) {
+          return 1;
+        }
+
+        return Math.min(1, availableHeight / naturalHeight);
+      });
+
+      setMobileScale(Math.min(...slideScales));
+    };
+
+    const animationFrame = requestAnimationFrame(computeMobileScale);
+    window.addEventListener('resize', computeMobileScale);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.removeEventListener('resize', computeMobileScale);
+    };
+  }, [slides]);
+
   const progressPercent = ((activeSlide + 1) / totalSlides) * 100;
 
   return (
@@ -318,23 +360,121 @@ export default function InvestorDeckPage() {
             <span className="inline-flex items-center rounded-full border border-[hsl(221_72%_66%)] bg-[hsl(221_84%_95%)] px-3 py-1 font-semibold text-[hsl(221_72%_30%)]">
               Investor slideshow
             </span>
-            <span className="inline-flex items-center rounded-full border border-[hsl(220_16%_84%)] bg-white px-3 py-1 font-medium text-[hsl(220_14%_30%)]">
+            <span className="hidden items-center rounded-full border border-[hsl(220_16%_84%)] bg-white px-3 py-1 font-medium text-[hsl(220_14%_30%)] sm:inline-flex">
               Use arrow keys
             </span>
+            <span className="inline-flex items-center rounded-full border border-[hsl(220_16%_84%)] bg-white px-3 py-1 font-medium text-[hsl(220_14%_30%)] sm:hidden">
+              Swipe side to side
+            </span>
           </div>
-          <p className="text-sm font-semibold text-[hsl(220_12%_46%)]">Slide {activeSlide + 1} / {totalSlides}</p>
+          <p className="hidden text-sm font-semibold text-[hsl(220_12%_46%)] sm:block">Slide {activeSlide + 1} / {totalSlides}</p>
+        </section>
+
+        <section className="sm:hidden">
+          <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {slides.map((slide, index) => {
+              const mobileBody = index === 0 ? (
+                <div className="flex h-full flex-col justify-between gap-4">
+                  <div className="space-y-4 text-[hsl(214_40%_90%)]">
+                    <p className="text-[18px] font-semibold leading-8 text-[hsl(214_100%_83%)]">
+                      The biggest TAM that you ever will get a chance to invest in
+                    </p>
+                    <p>EANrunner helps suppliers and retailers turn product data into active sales channels.</p>
+                    <p>
+                      European commerce is fragmented. Suppliers have products. Retailers want assortment, but too many
+                      agreements never become live products because data and integrations are too slow.
+                    </p>
+                    <p>We are building the data layer between product supply and retail demand.</p>
+                  </div>
+
+                  <div className="border-t border-[hsl(220_34%_30%)] pt-2 text-[10px] leading-4 text-[hsl(217_22%_72%)]">
+                    <p>
+                      <sup>1</sup> Annual product purchasing volume behind European non-food retail.
+                    </p>
+                    <p className="mt-1">
+                      Source:{' '}
+                      <a
+                        href="https://ec.europa.eu/eurostat/statistics-explained/index.php"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-[hsl(214_100%_83%)] hover:underline"
+                      >
+                        Eurostat Statistics Explained
+                      </a>
+                    </p>
+                  </div>
+                </div>
+              ) : index === 7 ? (
+                <div className="space-y-4 text-[hsl(218_22%_92%)]">
+                  <div className="space-y-3">
+                    <p>EANrunner was founded by Jacob and Anders after years in eCommerce, distribution, and product data.</p>
+                    <p>We help brands, distributors, and retailers connect through product data, automation, and AI.</p>
+                    <p>Amazon famously started in a garage. We already have two.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <article className="overflow-hidden rounded-lg border border-[hsl(220_34%_30%)] bg-[hsl(225_42%_16%/0.65)] text-center">
+                      <img src="/about/jacob-hq-black.jpg" alt="Jacob's garage" className="h-36 w-full bg-[hsl(225_36%_14%)] object-contain" loading="lazy" />
+                      <div className="p-2.5">
+                      <p className="font-semibold text-[hsl(214_36%_92%)]">Jacob</p>
+                      <a href="mailto:jacob@eanrunner.com" className="mt-1 block text-[11px] text-[hsl(214_100%_83%)] hover:underline">jacob@eanrunner.com</a>
+                      </div>
+                    </article>
+                    <article className="overflow-hidden rounded-lg border border-[hsl(220_34%_30%)] bg-[hsl(225_42%_16%/0.65)] text-center">
+                      <img src="/about/anders-garage-white.jpg" alt="Anders' garage" className="h-36 w-full bg-[hsl(225_36%_14%)] object-contain" loading="lazy" />
+                      <div className="p-2.5">
+                      <p className="font-semibold text-[hsl(214_36%_92%)]">Anders</p>
+                      <a href="mailto:anders@eanrunner.com" className="mt-1 block text-[11px] text-[hsl(214_100%_83%)] hover:underline">anders@eanrunner.com</a>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              ) : slide.body;
+
+              return (
+                <article
+                  key={slide.title}
+                  className="relative h-[calc(100vh-190px)] min-h-[520px] w-[88vw] shrink-0 snap-center overflow-hidden rounded-3xl border border-[hsl(225_72%_28%)] shadow-[0_20px_44px_rgb(8_20_60/0.38)]"
+                  style={deckBackground}
+                  aria-label={`Slide ${index + 1} of ${totalSlides}`}
+                >
+                  <div className="h-1 w-full bg-[hsl(223_48%_20%)]">
+                    <div className="h-full bg-[hsl(221_92%_55%)]" style={{ width: `${((index + 1) / totalSlides) * 100}%` }} />
+                  </div>
+
+                  <div
+                    ref={(node) => {
+                      mobileViewportRefs.current[index] = node;
+                    }}
+                    className="h-[calc(100%-4px)] overflow-hidden px-5 py-6"
+                  >
+                    <div
+                      ref={(node) => {
+                        mobileContentRefs.current[index] = node;
+                      }}
+                      className="origin-top-left [&_h3]:text-[20px] [&_h3]:leading-8 [&_li]:text-[15px] [&_li]:leading-6 [&_p]:text-[15px] [&_p]:leading-7 [&_.text-3xl]:text-[26px] [&_.text-3xl]:leading-9 [&_ul]:space-y-2.5"
+                      style={{
+                        transform: `scale(${mobileScale})`,
+                        width: `${100 / mobileScale}%`,
+                      }}
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[hsl(214_100%_82%)]">{slide.kicker}</p>
+                      <h2 className="mt-2 text-[38px] font-bold leading-[1.08] text-white">{slide.title}</h2>
+                      <div className="mt-4">
+                        {mobileBody}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-center text-xs font-medium text-[hsl(220_12%_46%)]">Swipe to browse all {totalSlides} slides</p>
         </section>
 
         <section
-          className="relative flex h-[78vh] min-h-[700px] max-h-[860px] flex-col overflow-hidden rounded-3xl border border-[hsl(225_72%_28%)] shadow-[0_24px_60px_rgb(8_20_60/0.45)]"
-          style={{
-            backgroundImage: [
-              'radial-gradient(120% 120% at 80% 0%, rgba(84, 112, 255, 0.30) 0%, rgba(84, 112, 255, 0.0) 42%)',
-              'radial-gradient(120% 120% at 0% 100%, rgba(50, 88, 235, 0.24) 0%, rgba(50, 88, 235, 0.0) 40%)',
-              'repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 1px, rgba(255,255,255,0) 1px 34px)',
-              'linear-gradient(135deg, hsl(226 88% 14%) 0%, hsl(227 86% 12%) 46%, hsl(231 78% 19%) 100%)',
-            ].join(','),
-          }}
+          className="relative hidden h-[78vh] min-h-[700px] max-h-[860px] flex-col overflow-hidden rounded-3xl border border-[hsl(225_72%_28%)] shadow-[0_24px_60px_rgb(8_20_60/0.45)] sm:flex"
+          style={deckBackground}
         >
           <div className="pointer-events-none absolute -right-10 top-20 h-16 w-72 rounded-xl bg-[hsl(220_60%_75%/0.12)] blur-[1px]" />
           <div className="pointer-events-none absolute -right-24 top-44 h-16 w-80 rounded-xl bg-[hsl(220_60%_75%/0.12)] blur-[1px]" />
@@ -351,7 +491,7 @@ export default function InvestorDeckPage() {
             <h1 className="mt-2 text-3xl font-bold leading-tight text-white sm:text-5xl">
               {slides[activeSlide].title}
             </h1>
-            <div className="mt-6 h-[calc(100%-110px)] overflow-y-auto pr-1">{slides[activeSlide].body}</div>
+            <div className="mt-6 h-[calc(100%-110px)] overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">{slides[activeSlide].body}</div>
           </article>
 
           <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-t border-[hsl(222_38%_24%)] bg-[hsl(225_68%_12%/0.82)] px-6 py-4 backdrop-blur-sm sm:px-8">

@@ -2,8 +2,15 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
+import { useDocumentMeta } from './useDocumentMeta';
 
 export default function DistributorPricingPage() {
+  useDocumentMeta({
+    title: 'Distributor Pricing: 2% Commission',
+    description: 'Distributor pricing from EANrunner: pay 2% commission only on sales generated through connected retailer channels.',
+    path: '/pricing/distributors',
+  });
+
   const openGmailCompose = () => {
     const composeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent('info@eanrunner.com')}&su=${encodeURIComponent('Connect as distributor')}`;
     window.open(composeUrl, '_blank', 'noopener,noreferrer');

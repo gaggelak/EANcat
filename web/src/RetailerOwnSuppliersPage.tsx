@@ -2,8 +2,15 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
+import { useDocumentMeta } from './useDocumentMeta';
 
 export default function RetailerOwnSuppliersPage() {
+  useDocumentMeta({
+    title: 'Retailer Pricing for Own Suppliers',
+    description: 'See EANrunner pricing for retailers managing their own suppliers, including per-product pricing and minimum monthly spend.',
+    path: '/pricing/retailers/own-suppliers',
+  });
+
   const openGmailCompose = () => {
     const composeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent('info@eanrunner.com')}&su=${encodeURIComponent('Manage my own suppliers with EANrunner')}`;
     window.open(composeUrl, '_blank', 'noopener,noreferrer');

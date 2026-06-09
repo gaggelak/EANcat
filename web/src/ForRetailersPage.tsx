@@ -20,9 +20,9 @@ const MATCH_IMAGES = [
 
 export default function ForRetailersPage() {
   useDocumentMeta({
-    title: 'For Retailers',
+    title: 'For Retailers: Source and Sync Products',
     description:
-      'Expand your shop and sell more products. Access 100,000+ dropshipping & cross-docking products with the highest margins, and push them live in minutes.',
+      'Expand your assortment with 100,000+ wholesale products, live stock feeds, and automated pricing workflows built for European retailers.',
     path: '/for-retailers',
   });
 

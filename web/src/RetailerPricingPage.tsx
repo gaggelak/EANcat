@@ -2,6 +2,7 @@ import { ArrowLeft, FileText, Image, Languages, RefreshCw, Sparkles, Tags } from
 import { Link } from 'react-router-dom';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
+import { useDocumentMeta } from './useDocumentMeta';
 
 const includedFeatures = [
   { title: 'Hourly stock updates', Icon: RefreshCw },
@@ -13,6 +14,12 @@ const includedFeatures = [
 ];
 
 export default function RetailerPricingPage() {
+  useDocumentMeta({
+    title: 'Retailer Pricing: From 0 EUR',
+    description: 'Retailer pricing from EANrunner with free access tiers, hourly stock updates, price automation, and optional scaling for large catalogs.',
+    path: '/pricing/retailers',
+  });
+
   const openGmailCompose = () => {
     const composeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent('info@eanrunner.com')}&su=${encodeURIComponent('Start as retailer')}`;
     window.open(composeUrl, '_blank', 'noopener,noreferrer');

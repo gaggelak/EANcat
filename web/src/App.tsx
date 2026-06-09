@@ -380,15 +380,14 @@ function App() {
   useDocumentMeta(
     decodedRouteBrand
       ? {
-          title: `${decodedRouteBrand} products`,
-          description: `Browse ${decodedRouteBrand} products in the EANrunner catalogue — enriched product data, live stock, and competitive wholesale prices across Europe.`,
+          title: `${decodedRouteBrand} Wholesale Products`,
+          description: `Browse ${decodedRouteBrand} wholesale products with EAN data, live stock updates, and competitive EU market pricing in the EANrunner catalog.`,
           path: `/brand/${encodeURIComponent(decodedRouteBrand)}`,
         }
       : {
-          title: 'EANrunner — The catalogue',
-          rawTitle: true,
+          title: 'Wholesale Product Catalog',
           description:
-            'Browse 100,000+ products with enriched data, live stock, and competitive wholesale prices from reliable European distributors.',
+            'Discover 100,000+ wholesale products with enriched EAN data, live stock, and competitive market pricing for European retailers and distributors.',
           path: '/',
         },
   );

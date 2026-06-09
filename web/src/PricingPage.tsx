@@ -2,8 +2,15 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PageTopBar from './PageTopBar';
 import SiteFooter from './SiteFooter';
+import { useDocumentMeta } from './useDocumentMeta';
 
 export default function PricingPage() {
+  useDocumentMeta({
+    title: 'Pricing',
+    description: 'See EANrunner pricing for distributors and retailers, including commission-based models and catalog activation costs.',
+    path: '/pricing',
+  });
+
   return (
     <div className="min-h-screen bg-[hsl(220_18%_97%)] text-[hsl(222_47%_12%)]">
       <PageTopBar />

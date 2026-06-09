@@ -7,9 +7,9 @@ import { useDocumentMeta } from './useDocumentMeta';
 
 export default function AboutUsPage() {
   useDocumentMeta({
-    title: 'About us',
+    title: 'About EANrunner',
     description:
-      'EANrunner connects distributors and retailers with live, enriched product data and market-ready catalog automation. Meet the team behind it.',
+      'Learn about EANrunner, the team helping distributors, brands, and retailers scale cross-border ecommerce with structured product data and automation.',
     path: '/about-us',
   });
 

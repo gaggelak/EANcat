@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, Package } from 'lucide-react';
 import { getProductByEan } from './api';
 import type { MarginGrade, PublicProduct } from './types';
 import SiteFooter from './SiteFooter';
+import { useDocumentMeta } from './useDocumentMeta';
 
 const GRADE_BADGE: Record<MarginGrade, string> = {
   A: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -51,6 +52,14 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<PublicProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useDocumentMeta({
+    title: product ? `${product.brand} ${product.title}` : ean ? `Product ${ean}` : 'Product Details',
+    description: product
+      ? `View ${product.title} by ${product.brand} with EAN data, stock status, margin grade, and market pricing insights in the EANrunner catalog.`
+      : 'View product details in the EANrunner wholesale catalog, including stock status, pricing, and margin insights.',
+    path: ean ? `/product/${encodeURIComponent(ean)}` : '/product',
+  });
 
   useEffect(() => {
     if (!ean) return;

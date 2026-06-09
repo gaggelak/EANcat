@@ -54,9 +54,9 @@ const STEPS = [
 
 export default function HowItWorksPage() {
   useDocumentMeta({
-    title: 'How it works',
+    title: 'How EANrunner Works',
     description:
-      'How EANrunner works: connect suppliers, find high-margin products with local price data, and push them live to your shop with daily stock and pricing sync.',
+      'See how EANrunner turns supplier data into live retail catalogs with product enrichment, integrations, and automated stock and price syncing.',
     path: '/how-it-works',
   });
 
