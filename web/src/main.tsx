@@ -11,6 +11,10 @@ const ProductDetailPage = lazy(() => import('./ProductDetailPage.tsx'))
 const WorkWithUsPage = lazy(() => import('./WorkWithUsPage.tsx'))
 const ForDistributorsPage = lazy(() => import('./ForDistributorsPage.tsx'))
 const ForRetailersPage = lazy(() => import('./ForRetailersPage.tsx'))
+const PricingPage = lazy(() => import('./PricingPage.tsx'))
+const DistributorPricingPage = lazy(() => import('./DistributorPricingPage.tsx'))
+const RetailerPricingPage = lazy(() => import('./RetailerPricingPage.tsx'))
+const RetailerOwnSuppliersPage = lazy(() => import('./RetailerOwnSuppliersPage.tsx'))
 const GetApprovedPage = lazy(() => import('./GetApprovedPage.tsx'))
 const BlogPage = lazy(() => import('./BlogPage.tsx'))
 const BlogPostPage = lazy(() => import('./BlogPostPage.tsx'))
@@ -30,6 +34,10 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/for-retailers" element={<ForRetailersPage />} />
           <Route path="/for-distributors" element={<ForDistributorsPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/pricing/distributors" element={<DistributorPricingPage />} />
+          <Route path="/pricing/retailers" element={<RetailerPricingPage />} />
+          <Route path="/pricing/retailers/own-suppliers" element={<RetailerOwnSuppliersPage />} />
           <Route path="/get-approved" element={<GetApprovedPage />} />
           <Route path="/work-with-us" element={<WorkWithUsPage />} />
           <Route path="/blog" element={<BlogPage />} />
