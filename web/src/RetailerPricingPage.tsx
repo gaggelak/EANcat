@@ -55,7 +55,7 @@ export default function RetailerPricingPage() {
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div>
                 <p className="text-[34px] font-black leading-none text-[hsl(221_92%_44%)]">€0</p>
-                <p className="mt-1 text-sm text-[hsl(220_12%_34%)]">for the first 10,000 active products</p>
+                <p className="mt-1 text-sm text-[hsl(220_12%_34%)]">for the first 1,000 active products</p>
               </div>
               <div className="sm:col-span-2">
                 <p className="text-sm font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">After that</p>
