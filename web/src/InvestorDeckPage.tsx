@@ -86,19 +86,19 @@ export default function InvestorDeckPage() {
         body: (
           <div className="flex h-full flex-col gap-8">
             <p className="max-w-4xl text-[24px] leading-10 text-[hsl(214_40%_92%)]">
-              We collect product data, format it, and integrate it with retailers.
+              We turn messy supplier data into clean, structured product data that retailers can use instantly.
             </p>
             <div className="mt-3 flex-1 md:mt-6">
               <ul className="max-w-5xl space-y-5 text-[22px] leading-9 text-[hsl(218_22%_92%)]">
-                <li className="border-b border-[hsl(220_34%_30%)] pb-2">1. Ingest supplier data</li>
-                <li className="border-b border-[hsl(220_34%_30%)] pb-2">2. Structure product content</li>
-                <li className="border-b border-[hsl(220_34%_30%)] pb-2">3. Enrich and translate</li>
-                <li className="border-b border-[hsl(220_34%_30%)] pb-2">4. Sync price and stock</li>
-                <li className="border-b border-[hsl(220_34%_30%)] pb-2">5. Deliver retailer-ready feeds</li>
-                <li className="border-b border-[hsl(220_34%_30%)] pb-2">6. Keep products live across channels</li>
+                <li className="border-b border-[hsl(220_34%_30%)] pb-2">1. Collect product data from any supplier source — files, feeds, portals</li>
+                <li className="border-b border-[hsl(220_34%_30%)] pb-2">2. Clean and normalize it into one consistent structure</li>
+                <li className="border-b border-[hsl(220_34%_30%)] pb-2">3. Complete missing attributes, images, and translations</li>
+                <li className="border-b border-[hsl(220_34%_30%)] pb-2">4. Validate every product against retailer requirements</li>
+                <li className="border-b border-[hsl(220_34%_30%)] pb-2">5. Deliver structured, retailer-ready product data</li>
+                <li className="border-b border-[hsl(220_34%_30%)] pb-2">6. Keep it updated automatically as sources change</li>
               </ul>
             </div>
-            <p className="pb-1 text-3xl font-semibold text-[hsl(214_100%_83%)]">Make products go live faster.</p>
+            <p className="pb-1 text-3xl font-semibold text-[hsl(214_100%_83%)]">We make product data structured, complete, and ready to sell.</p>
           </div>
         ),
       },
