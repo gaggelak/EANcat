@@ -133,6 +133,7 @@ const searchQuerySchema = z.object({
   brand: z.string().trim().max(5000).optional(),
   market: z.enum(['dk', 'se', 'fi']).optional(),
   grades: z.string().trim().max(40).optional(), // comma-separated e.g. "A,B,C"
+  competition: z.string().trim().max(20).optional(), // comma-separated levels 0,1,2,3
   inStock: z.enum(['true', 'false']).optional(),
   hasImage: z.enum(['true', 'false']).optional(),
 });
@@ -238,6 +239,15 @@ function activeGradesFrom(value: string | undefined): string[] {
     .split(',')
     .map((g) => g.trim().toUpperCase())
     .filter((g) => ALLOWED_GRADES.has(g));
+}
+
+function activeCompetitionLevelsFrom(value: string | undefined): number[] {
+  return [...new Set(
+    (value || '')
+      .split(',')
+      .map((level) => Number.parseInt(level.trim(), 10))
+      .filter((level) => Number.isInteger(level) && level >= 0 && level <= 3),
+  )].sort((a, b) => a - b);
 }
 
 // ── Rate limiting + CORS helpers ──────────────────────────────────────────────
@@ -436,6 +446,7 @@ async function main(): Promise<void> {
     const categoryValues = splitCsv(parsed.data.category);
     const brandValues = splitCsv(parsed.data.brand);
     const activeGrades = activeGradesFrom(parsed.data.grades);
+    const activeCompetitionLevels = activeCompetitionLevelsFrom(parsed.data.competition);
 
     try {
       const pool = await getPool();
@@ -460,6 +471,18 @@ async function main(): Promise<void> {
           // Safe: values are from ALLOWED_GRADES only.
           const inList = activeGrades.map((g) => `'${g}'`).join(',');
           conditions.push(`${m.grade} IN (${inList})`);
+        }
+        if (activeCompetitionLevels.length > 0) {
+          // Safe: values are clamped to 0..3 only.
+          const inList = activeCompetitionLevels.join(',');
+          conditions.push(`
+            CASE
+              WHEN COALESCE(${m.competitors}, 0) <= 0 THEN 0
+              WHEN ${m.competitors} = 1 THEN 1
+              WHEN ${m.competitors} <= 3 THEN 2
+              ELSE 3
+            END IN (${inList})
+          `);
         }
         return conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
       };
