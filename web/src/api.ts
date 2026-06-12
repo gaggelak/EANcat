@@ -31,11 +31,13 @@ export function getProducts(
   limit = 48,
   category?: string,
   brand?: string,
-  market = 'dk',
+  market = 'fi',
   page = 1,
   grades?: Set<string>,
+  competitionLevels?: Set<number>,
   inStock?: boolean,
   hasImage?: boolean,
+  includeTotal = true,
 ): Promise<ProductListResponse> {
   const params = new URLSearchParams();
   if (query) params.set('query', query);
@@ -45,8 +47,10 @@ export function getProducts(
   if (brand) params.set('brand', brand);
   params.set('market', market);
   if (grades && grades.size > 0) params.set('grades', [...grades].join(','));
+  if (competitionLevels && competitionLevels.size > 0) params.set('competition', [...competitionLevels].sort((a, b) => a - b).join(','));
   if (inStock) params.set('inStock', 'true');
   if (hasImage) params.set('hasImage', 'true');
+  if (!includeTotal) params.set('includeTotal', 'false');
   return readJson<ProductListResponse>(`/api/public/products?${params.toString()}`);
 }
 
@@ -63,7 +67,7 @@ export function getCategories(
 
 export function getBrandClusters(
   query: string,
-  market = 'dk',
+  market = 'fi',
   brandOffset = 0,
   brandLimit = 20,
   perBrandLimit = 9,
@@ -91,7 +95,7 @@ export function getCatalogStats(): Promise<CatalogStatsResponse> {
   return readJson<CatalogStatsResponse>('/api/public/stats');
 }
 
-export function getProductByEan(ean: string, market = 'dk'): Promise<ProductDetailResponse> {
+export function getProductByEan(ean: string, market = 'fi'): Promise<ProductDetailResponse> {
   const params = new URLSearchParams({ market });
   return readJson<ProductDetailResponse>(`/api/public/products/${encodeURIComponent(ean)}?${params.toString()}`);
 }

@@ -18,7 +18,7 @@ export type PublicProduct = {
 export type ProductListResponse = {
   products: PublicProduct[];
   count: number;
-  total: number;
+  total: number | null;
 };
 
 export type BrandClusterGroup = {

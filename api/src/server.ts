@@ -134,6 +134,7 @@ const searchQuerySchema = z.object({
   market: z.enum(['dk', 'se', 'fi']).optional(),
   grades: z.string().trim().max(40).optional(), // comma-separated e.g. "A,B,C"
   competition: z.string().trim().max(20).optional(), // comma-separated levels 0,1,2,3
+  includeTotal: z.enum(['true', 'false']).optional(),
   inStock: z.enum(['true', 'false']).optional(),
   hasImage: z.enum(['true', 'false']).optional(),
 });
@@ -441,6 +442,7 @@ async function main(): Promise<void> {
     const limit = parsed.data.limit ?? 48;
     const page = parsed.data.page ?? 1;
     const offset = (page - 1) * limit;
+    const includeTotal = parsed.data.includeTotal !== 'false';
 
     const rawQuery = normalizeQueryToken(parsed.data.query || '');
     const categoryValues = splitCsv(parsed.data.category);
@@ -492,9 +494,6 @@ async function main(): Promise<void> {
       dataRequest.input('offset', sql.Int, offset);
       const whereClause = buildWhere(dataRequest);
 
-      const countRequest = pool.request();
-      buildWhere(countRequest); // rebind same params on the count request
-
       const shouldPrioritizeImages = brandValues.length > 0 && parsed.data.hasImage !== 'true';
       const orderByClause = shouldPrioritizeImages
         ? `ORDER BY CASE WHEN has_image = 1 THEN 0 ELSE 1 END,
@@ -505,19 +504,24 @@ async function main(): Promise<void> {
                  CASE WHEN ${m.grade} = 'N/A' THEN 1 ELSE 0 END,
                  synced_at DESC, ean ASC`;
 
-      const [dataResult, countResult] = await Promise.all([
-        dataRequest.query(`
-          SELECT ${productSelectColumns(m)}
-          FROM dbo.showcase_product
-          ${whereClause}
-          ${orderByClause}
-          OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
-        `),
-        countRequest.query(`SELECT COUNT(*) AS total FROM dbo.showcase_product ${whereClause}`),
-      ]);
+      const dataResult = await dataRequest.query(`
+        SELECT ${productSelectColumns(m)}
+        FROM dbo.showcase_product
+        ${whereClause}
+        ${orderByClause}
+        OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
+      `);
+
+      let total: number | null = null;
+      if (includeTotal) {
+        const countRequest = pool.request();
+        buildWhere(countRequest); // rebind same params on the count request
+        const countResult = await countRequest.query(`SELECT COUNT(*) AS total FROM dbo.showcase_product ${whereClause}`);
+        total = countResult.recordset[0]?.total ?? 0;
+      }
 
       const products = (dataResult.recordset as ShowcaseRow[]).map(mapRow);
-      res.json({ products, count: products.length, total: countResult.recordset[0]?.total ?? 0 });
+      res.json({ products, count: products.length, total });
     } catch (err) {
       console.error('Error fetching products', err);
       res.status(500).json({ error: 'Internal server error' });

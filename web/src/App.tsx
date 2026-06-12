@@ -20,6 +20,7 @@ const FILTER_OPTIONS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const HOME_CATALOG_CACHE_KEY = 'webversion.home-catalog.cache.v4';
 const HOME_CATALOG_CACHE_TTL_MS = 60 * 60 * 1000;
 const URL_ALLOWED_GRADES = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'N/A']);
+const DEFAULT_MARKET = 'fi';
 
 type HomeCatalogCachePayload =
   | {
@@ -265,14 +266,20 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMes
 
 function marginRangeLabel(grade: string, marketPrice: number | null, currency: string | null): string | null {
   if (!marketPrice || marketPrice <= 0 || grade === 'N/A') return null;
-  const sym = currency === 'DKK' || currency === 'SEK' ? '' : '€';
-  const suffix = currency === 'DKK' ? ' kr' : currency === 'SEK' ? ' kr' : '';
-  const fmt = (v: number) => `${sym}${Math.round(Math.abs(v)).toLocaleString()}${suffix}`;
+  const ratesToEur: Record<string, number> = { EUR: 1, DKK: 0.134, SEK: 0.088 };
+  const marketCurrency = (currency || 'EUR').toUpperCase();
+  const rate = ratesToEur[marketCurrency] ?? 1;
+  const fmt = (v: number) => new Intl.NumberFormat('en-IE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(v * rate));
   switch (grade) {
     case 'A': return `More than +${fmt(marketPrice * 0.20)}`;
     case 'B': return `Between ${fmt(marketPrice * 0.10)} to ${fmt(marketPrice * 0.20)}`;
     case 'C': return `Between ${fmt(marketPrice * 0.05)} to ${fmt(marketPrice * 0.10)}`;
-    case 'D': return `Between ${currency === 'DKK' || currency === 'SEK' ? '0 kr' : '\u20ac0'} to ${fmt(marketPrice * 0.05)}`;
+    case 'D': return `Between €0.00 to ${fmt(marketPrice * 0.05)}`;
     case 'E': return `Loss between 0 and -${fmt(marketPrice * 0.10)}`;
     case 'F': return `Less than -${fmt(marketPrice * 0.10)}`;
     default: return null;
@@ -361,6 +368,22 @@ const ProductCard = memo(function ProductCard({
   );
 });
 
+function ProductCardSkeleton({ compact }: { compact?: boolean }) {
+  const compactClass = compact ? 'rounded-lg' : 'rounded-xl';
+  return (
+    <div className={`animate-pulse bg-white ${compactClass} border border-[hsl(220_14%_89%)] shadow-[0_1px_3px_0_rgb(0_0_0/0.06)] overflow-hidden`}>
+      <div className={`aspect-square bg-[hsl(220_18%_95%)] ${compact ? 'max-h-[180px]' : ''}`} />
+      <div className={`${compact ? 'p-2.5 gap-1.5' : 'p-3 gap-2'} flex flex-col`}>
+        <div className="h-2.5 w-16 rounded bg-[hsl(220_16%_90%)]" />
+        <div className="h-3 w-full rounded bg-[hsl(220_16%_90%)]" />
+        <div className="h-3 w-4/5 rounded bg-[hsl(220_16%_90%)]" />
+        <div className="h-5 w-full rounded bg-[hsl(220_16%_90%)]" />
+        <div className="h-2.5 w-3/4 rounded bg-[hsl(220_16%_90%)]" />
+      </div>
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 function App() {
@@ -407,7 +430,7 @@ function App() {
   const [selectedGrades, setSelectedGrades] = useState<Set<string>>(new Set());
   const [categorySearchTerm, setCategorySearchTerm] = useState('');
   const [brandSearchTerm, setBrandSearchTerm] = useState('');
-  const [market, setMarket] = useState('dk');
+  const [market, setMarket] = useState(DEFAULT_MARKET);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [products, setProducts] = useState<PublicProduct[]>([]);
@@ -434,6 +457,8 @@ function App() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const latestSuggestRequestRef = useRef(0);
   const suppressNextSuggestRef = useRef(false);
+  const dismissedSuggestionsQueryRef = useRef<string | null>(null);
+  const lastSuggestionQueryRef = useRef('');
   const selectedCategoryValues = useMemo(() => splitFilterValues(selectedCategory), [selectedCategory]);
   const selectedBrandValues = useMemo(() => splitFilterValues(selectedBrand), [selectedBrand]);
 
@@ -447,7 +472,7 @@ function App() {
     && !debouncedKeyword.trim()
     && selectedCompetitionLevels.size === 0
     && selectedGrades.size === 0
-    && market === 'dk'
+    && market === DEFAULT_MARKET
     && inStockOnly === true
     && hasPictureOnly === false;
   const pageSize = shouldUseCompactPreviewPageSize ? compactPreviewPageSize : defaultListPageSize;
@@ -498,7 +523,7 @@ function App() {
     setSelectedCategory('');
     setBrandFilter('');
     setKeyword('');
-    setMarket('dk');
+    setMarket(DEFAULT_MARKET);
     setInStockOnly(true);
     setHasPictureOnly(false);
     setSelectedGrades(new Set());
@@ -527,7 +552,10 @@ function App() {
         setMenuOpen(false);
       }
       if (searchBoxRef.current && (!target || !searchBoxRef.current.contains(target))) {
+        dismissedSuggestionsQueryRef.current = searchInputRef.current?.value.trim().toLowerCase() || null;
+        latestSuggestRequestRef.current += 1;
         setSuggestionsOpen(false);
+        setSuggestionsLoading(false);
         setActiveSuggestionIndex(-1);
       }
     };
@@ -547,7 +575,7 @@ function App() {
     const nextKeyword = (params.get('q') || '').trim();
     const nextCategory = (params.get('category') || '').trim();
     const nextMarketParam = (params.get('market') || '').trim().toLowerCase();
-    const nextMarket = nextMarketParam === 'dk' || nextMarketParam === 'se' || nextMarketParam === 'fi' ? nextMarketParam : 'dk';
+    const nextMarket = nextMarketParam === 'dk' || nextMarketParam === 'se' || nextMarketParam === 'fi' ? nextMarketParam : DEFAULT_MARKET;
 
     const nextGrades = new Set(
       (params.get('grades') || '')
@@ -605,7 +633,7 @@ function App() {
     const normalizedKeyword = keyword.trim();
     if (normalizedKeyword) params.set('q', normalizedKeyword);
     if (selectedCategory.trim()) params.set('category', selectedCategory.trim());
-    if (market !== 'dk') params.set('market', market);
+    if (market !== DEFAULT_MARKET) params.set('market', market);
 
     const sortedGrades = [...selectedGrades].sort((a, b) => a.localeCompare(b));
     if (sortedGrades.length > 0) params.set('grades', sortedGrades.join(','));
@@ -683,7 +711,7 @@ function App() {
         && selectedBrandValues.length === 0
         && selectedCompetitionLevels.size === 0
         && selectedGrades.size === 0
-        && market === 'dk'
+        && market === DEFAULT_MARKET
         && inStockOnly === true
         && hasPictureOnly === false;
 
@@ -794,15 +822,46 @@ function App() {
           market,
           effectivePage,
           selectedGrades.size > 0 ? selectedGrades : undefined,
+          selectedCompetitionLevels.size > 0 ? selectedCompetitionLevels : undefined,
           inStockOnly || undefined,
           hasPictureOnly || undefined,
+          false,
         );
-        const backendTotal = data.total ?? data.count;
 
         if (!active) return;
         setProducts(data.products);
-        setTotalProducts(backendTotal);
-        setHasLoadedTotalProducts(true);
+        if (data.total != null) {
+          setTotalProducts(data.total);
+          setHasLoadedTotalProducts(true);
+        } else {
+          setTotalProducts(data.count);
+          setHasLoadedTotalProducts(false);
+
+          // Load the exact total separately so products can render immediately.
+          void getProducts(
+            normalizedKeyword,
+            1,
+            selectedCategoryFilter,
+            selectedBrandFilter,
+            market,
+            1,
+            selectedGrades.size > 0 ? selectedGrades : undefined,
+            selectedCompetitionLevels.size > 0 ? selectedCompetitionLevels : undefined,
+            inStockOnly || undefined,
+            hasPictureOnly || undefined,
+            true,
+          )
+            .then((totalData) => {
+              if (!active) return;
+              if (totalData.total != null) {
+                setTotalProducts(totalData.total);
+                setHasLoadedTotalProducts(true);
+              }
+            })
+            .catch(() => {
+              // Keep showing partial result count if total lookup fails.
+            });
+        }
 
         if (canUseHomeCatalogCache) {
           saveHomeCatalogCache({
@@ -813,7 +872,7 @@ function App() {
               limit: effectiveLimit,
             }),
             products: data.products,
-            totalProducts: backendTotal,
+            totalProducts: data.total ?? data.count,
           });
         }
       } catch (err) {
@@ -987,14 +1046,14 @@ function App() {
     if (keyword.trim()) {
       chips.push({ key: 'search', label: `Search: ${keyword.trim()}`, clear: () => setKeyword('') });
     }
-    if (market !== 'dk') {
-      chips.push({ key: 'market', label: `Market: ${market.toUpperCase()}`, clear: () => setMarket('dk') });
+    if (market !== DEFAULT_MARKET) {
+      chips.push({ key: 'market', label: `Market: ${market.toUpperCase()}`, clear: () => setMarket(DEFAULT_MARKET) });
     }
     const isDefaultFrontPageState = isCompactVersion
       && !decodedRouteBrand.trim()
       && inStockOnly
       && !hasPictureOnly
-      && market === 'dk'
+      && market === DEFAULT_MARKET
       && !keyword.trim()
       && selectedCategoryValues.length === 0
       && selectedBrandValues.length === 0
@@ -1049,6 +1108,9 @@ function App() {
   const searchPlaceholder = hasLoadedTotalProducts
     ? `Search EAN, Title, MPN of ${totalProducts.toLocaleString()} products`
     : 'Search EAN, Title, MPN';
+  const isSearchLoading = loading && debouncedKeyword.trim().length > 0;
+  const shouldShowGridSkeletons = loading && !shouldClusterByBrand && visibleProducts.length === 0;
+  const skeletonCount = isMobileViewport ? 6 : 12;
 
   useEffect(() => {
     const inputFocused = typeof document !== 'undefined' && document.activeElement === searchInputRef.current;
@@ -1064,7 +1126,32 @@ function App() {
     }
 
     const query = keyword.trim();
+    const queryLower = query.toLowerCase();
+    const queryChanged = queryLower !== lastSuggestionQueryRef.current;
+    if (queryChanged) {
+      lastSuggestionQueryRef.current = queryLower;
+    }
+
+    if (!queryChanged && !suggestionsOpen) {
+      setSuggestionsLoading(false);
+      return;
+    }
+
+    if (
+      dismissedSuggestionsQueryRef.current
+      && dismissedSuggestionsQueryRef.current !== queryLower
+    ) {
+      dismissedSuggestionsQueryRef.current = null;
+    }
+
+    if (dismissedSuggestionsQueryRef.current === queryLower) {
+      setSuggestionsLoading(false);
+      return;
+    }
+
     if (query.length < 2) {
+      lastSuggestionQueryRef.current = '';
+      dismissedSuggestionsQueryRef.current = null;
       setSearchSuggestions([]);
       setSuggestionsLoading(false);
       setSuggestionsOpen(false);
@@ -1072,7 +1159,6 @@ function App() {
       return;
     }
 
-    const queryLower = query.toLowerCase();
     const localBrandStartsWith = availableBrandOptions
       .filter((brand) => brand.toLowerCase().startsWith(queryLower))
       .slice(0, 4)
@@ -1181,7 +1267,7 @@ function App() {
     }, 60);
 
     return () => clearTimeout(timer);
-  }, [keyword, market, inStockOnly, hasPictureOnly, availableBrandOptions, availableCategoryOptions, products]);
+  }, [keyword, market, inStockOnly, hasPictureOnly, availableBrandOptions, availableCategoryOptions, products, suggestionsOpen]);
 
   const applySuggestion = (suggestion: SearchSuggestion) => {
     suppressNextSuggestRef.current = true;
@@ -1195,6 +1281,8 @@ function App() {
       setKeyword(suggestion.value);
     }
     setSearchSuggestions([]);
+    dismissedSuggestionsQueryRef.current = suggestion.value.trim().toLowerCase() || null;
+    latestSuggestRequestRef.current += 1;
     setSuggestionsOpen(false);
     setSuggestionsLoading(false);
     setActiveSuggestionIndex(-1);
@@ -1241,6 +1329,8 @@ function App() {
                       value={keyword}
                       onChange={(e) => setKeyword(e.target.value)}
                       onFocus={() => {
+                        const queryLower = keyword.trim().toLowerCase();
+                        if (dismissedSuggestionsQueryRef.current === queryLower) return;
                         if (searchSuggestions.length > 0 || suggestionsLoading) {
                           setSuggestionsOpen(true);
                         }
@@ -1265,7 +1355,10 @@ function App() {
                           if (selected) applySuggestion(selected);
                         } else if (event.key === 'Escape') {
                           event.preventDefault();
+                          dismissedSuggestionsQueryRef.current = keyword.trim().toLowerCase() || null;
+                          latestSuggestRequestRef.current += 1;
                           setSuggestionsOpen(false);
+                          setSuggestionsLoading(false);
                           setActiveSuggestionIndex(-1);
                         }
                       }}
@@ -1313,7 +1406,7 @@ function App() {
                   )}
                   {loading ? (
                     <span className="inline-flex h-7 shrink-0 items-center rounded-md border border-[hsl(221_72%_72%)] bg-[hsl(221_84%_95%)] px-2 text-[10px] font-semibold text-[hsl(221_72%_32%)]">
-                      Loading results...
+                      {isSearchLoading ? 'Searching products...' : 'Loading catalog...'}
                     </span>
                   ) : null}
 
@@ -1462,9 +1555,9 @@ function App() {
                       onChange={(e) => setMarket(e.target.value)}
                       className="w-full rounded-md border border-[hsl(220_14%_89%)] bg-white px-3 py-2 text-xs text-[hsl(222_47%_8%)]"
                     >
+                      <option value="fi">FI</option>
                       <option value="dk">DK</option>
                       <option value="se">SE</option>
-                      <option value="fi">FI</option>
                     </select>
                   </label>
 
@@ -1666,7 +1759,7 @@ function App() {
                           setSelectedCategory('');
                           setBrandFilter('');
                           setKeyword('');
-                          setMarket('dk');
+                          setMarket(DEFAULT_MARKET);
                           setInStockOnly(true);
                           setHasPictureOnly(false);
                           setSelectedGrades(new Set());
@@ -1970,14 +2063,18 @@ function App() {
 
                 {viewMode === 'grid' ? (
                   <div className={`grid gap-2 ${isMobileViewport ? 'grid-cols-2' : '[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]'}`}>
-                    {visibleProducts.map((product, index) => (
-                      <ProductCard
-                        key={product.ean}
-                        product={product}
-                        compact
-                        eagerImage={index < ABOVE_THE_FOLD_PRIORITY_COUNT}
-                      />
-                    ))}
+                    {shouldShowGridSkeletons
+                      ? Array.from({ length: skeletonCount }).map((_, index) => (
+                        <ProductCardSkeleton key={`skeleton-${index}`} compact />
+                      ))
+                      : visibleProducts.map((product, index) => (
+                        <ProductCard
+                          key={product.ean}
+                          product={product}
+                          compact
+                          eagerImage={index < ABOVE_THE_FOLD_PRIORITY_COUNT}
+                        />
+                      ))}
                   </div>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-[hsl(220_14%_89%)] bg-white">
@@ -2034,7 +2131,9 @@ function App() {
                   </button>
                 )}
                 <span className="text-xs text-[hsl(220_12%_45%)]">
-                  Loaded {visibleProducts.length.toLocaleString()} of {totalProducts.toLocaleString()} products
+                  {loading
+                    ? 'Loading...'
+                    : `Showing ${visibleProducts.length.toLocaleString()} of ${totalProducts.toLocaleString()} products`}
                 </span>
               </div>
             )}

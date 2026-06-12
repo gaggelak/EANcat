@@ -19,14 +19,20 @@ const GRADE_BADGE: Record<MarginGrade, string> = {
 // Estimated margin range from the public grade — mirrors App.tsx marginRangeLabel.
 function marginRangeLabel(grade: MarginGrade, marketPrice: number | null, currency: string | null): string | null {
   if (!marketPrice || marketPrice <= 0 || grade === 'N/A') return null;
-  const sym = currency === 'DKK' || currency === 'SEK' ? '' : '€';
-  const suffix = currency === 'DKK' ? ' kr' : currency === 'SEK' ? ' kr' : '';
-  const fmt = (v: number) => `${sym}${Math.round(Math.abs(v)).toLocaleString()}${suffix}`;
+  const ratesToEur: Record<string, number> = { EUR: 1, DKK: 0.134, SEK: 0.088 };
+  const marketCurrency = (currency || 'EUR').toUpperCase();
+  const rate = ratesToEur[marketCurrency] ?? 1;
+  const fmt = (v: number) => new Intl.NumberFormat('en-IE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(v * rate));
   switch (grade) {
     case 'A': return `More than +${fmt(marketPrice * 0.20)}`;
     case 'B': return `Between ${fmt(marketPrice * 0.10)} to ${fmt(marketPrice * 0.20)}`;
     case 'C': return `Between ${fmt(marketPrice * 0.05)} to ${fmt(marketPrice * 0.10)}`;
-    case 'D': return `Between ${currency === 'DKK' || currency === 'SEK' ? '0 kr' : '€0'} to ${fmt(marketPrice * 0.05)}`;
+    case 'D': return `Between €0.00 to ${fmt(marketPrice * 0.05)}`;
     case 'E': return `Loss between 0 and -${fmt(marketPrice * 0.10)}`;
     case 'F': return `Less than -${fmt(marketPrice * 0.10)}`;
     default: return null;
@@ -46,7 +52,7 @@ export default function ProductDetailPage() {
   const location = useLocation();
   const market = (() => {
     const m = (new URLSearchParams(location.search).get('market') || '').toLowerCase();
-    return m === 'se' || m === 'fi' ? m : 'dk';
+    return m === 'dk' || m === 'se' || m === 'fi' ? m : 'fi';
   })();
 
   const [product, setProduct] = useState<PublicProduct | null>(null);
