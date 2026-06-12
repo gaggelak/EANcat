@@ -1,6 +1,6 @@
 ﻿import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, Filter, Loader2, Menu, Search, X } from 'lucide-react';
+import { Check, ChevronDown, Filter, Loader2, Menu, Search, X } from 'lucide-react';
 import { getBrandClusters, getCategories, getProducts, getSearchSuggestions } from './api';
 import type { BrandClusterGroup, CategoryEntry, PublicProduct, SearchSuggestion } from './types';
 import SiteFooter from './SiteFooter';
@@ -61,6 +61,25 @@ function splitFilterValues(value: string): string[] {
 
 function joinFilterValues(values: string[]): string {
   return [...new Set(values.map((item) => item.trim()).filter(Boolean))].join(',');
+}
+
+function formatCategoryDisplayName(value: string): string {
+  const afterChevron = value.includes('>') ? value.split('>').at(-1) ?? value : value;
+  const normalized = afterChevron.trim();
+  if (normalized.includes(' - ')) {
+    return normalized.split(' - ').at(-1)?.trim() || normalized;
+  }
+  return normalized;
+}
+
+function summarizeQuickFilterSelection(
+  label: string,
+  values: string[],
+  formatter: (value: string) => string = (value) => value,
+): string {
+  if (values.length === 0) return label;
+  if (values.length === 1) return formatter(values[0]);
+  return `${label} (${values.length} selected)`;
 }
 
 const GRADE_STYLES: Record<string, { bg: string; text: string }> = {
@@ -465,10 +484,13 @@ function App() {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const searchBoxRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const quickCategoryRef = useRef<HTMLDivElement | null>(null);
+  const quickBrandRef = useRef<HTMLDivElement | null>(null);
   const latestSuggestRequestRef = useRef(0);
   const suppressNextSuggestRef = useRef(false);
   const dismissedSuggestionsQueryRef = useRef<string | null>(null);
   const lastSuggestionQueryRef = useRef('');
+  const [topQuickFilterOpen, setTopQuickFilterOpen] = useState<'category' | 'brand' | null>(null);
   const selectedCategoryValues = useMemo(() => splitFilterValues(selectedCategory), [selectedCategory]);
   const selectedBrandValues = useMemo(() => splitFilterValues(selectedBrand), [selectedBrand]);
 
@@ -533,6 +555,8 @@ function App() {
     setSelectedCategory('');
     setBrandFilter('');
     setKeyword('');
+    setCategorySearchTerm('');
+    setBrandSearchTerm('');
     setMarket(DEFAULT_MARKET);
     setInStockOnly(true);
     setHasPictureOnly(false);
@@ -545,9 +569,32 @@ function App() {
     setFiltersOpen(false);
   };
 
+  const commitQuickCategorySelection = (rawValue?: string) => {
+    const query = (rawValue ?? categorySearchTerm).trim();
+    if (!query) return false;
+    const normalizedQuery = query.toLowerCase();
+    const matches = availableCategoryOptions.filter((item) => item.name.trim().toLowerCase().includes(normalizedQuery));
+    const matched = matches.find((item) => item.name.trim().toLowerCase() === normalizedQuery) ?? (matches.length === 1 ? matches[0] : null);
+    if (!matched) return false;
+    setSelectedCategory(joinFilterValues([...selectedCategoryValues, matched.name]));
+    setCategorySearchTerm('');
+    return true;
+  };
+
+  const commitQuickBrandSelection = (rawValue?: string) => {
+    const query = (rawValue ?? brandSearchTerm).trim();
+    if (!query) return false;
+    const normalizedQuery = query.toLowerCase();
+    const matches = availableBrandOptions.filter((brand) => brand.trim().toLowerCase().includes(normalizedQuery));
+    const matched = matches.find((brand) => brand.trim().toLowerCase() === normalizedQuery) ?? (matches.length === 1 ? matches[0] : null);
+    if (!matched) return false;
+    setSelectedBrand(joinFilterValues([...selectedBrandValues, matched]));
+    setBrandSearchTerm('');
+    return true;
+  };
+
   useEffect(() => {
     const routeBrand = decodedRouteBrand.trim();
-    setSelectedBrand(routeBrand);
     if (routeBrand) {
       setInStockOnly(false);
       setHasPictureOnly(false);
@@ -568,6 +615,10 @@ function App() {
         setSuggestionsLoading(false);
         setActiveSuggestionIndex(-1);
       }
+      if (quickCategoryRef.current && (!target || !quickCategoryRef.current.contains(target))
+        && quickBrandRef.current && (!target || !quickBrandRef.current.contains(target))) {
+        setTopQuickFilterOpen(null);
+      }
     };
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('touchstart', onPointerDown);
@@ -584,6 +635,7 @@ function App() {
 
     const nextKeyword = (params.get('q') || '').trim();
     const nextCategory = (params.get('category') || '').trim();
+    const nextBrand = decodedRouteBrand.trim() || (params.get('brand') || '').trim();
     const nextMarketParam = (params.get('market') || '').trim().toLowerCase();
     const nextMarket = nextMarketParam === 'dk' || nextMarketParam === 'se' || nextMarketParam === 'fi' ? nextMarketParam : DEFAULT_MARKET;
 
@@ -610,6 +662,7 @@ function App() {
 
     if (keyword !== nextKeyword) setKeyword(nextKeyword);
     if (selectedCategory !== nextCategory) setSelectedCategory(nextCategory);
+    if (selectedBrand !== nextBrand) setSelectedBrand(nextBrand);
     if (market !== nextMarket) setMarket(nextMarket);
     if (inStockOnly !== nextInStockOnly) setInStockOnly(nextInStockOnly);
     if (hasPictureOnly !== nextHasPictureOnly) setHasPictureOnly(nextHasPictureOnly);
@@ -643,6 +696,7 @@ function App() {
     const normalizedKeyword = keyword.trim();
     if (normalizedKeyword) params.set('q', normalizedKeyword);
     if (selectedCategory.trim()) params.set('category', selectedCategory.trim());
+    if (selectedBrand.trim() && selectedBrandValues.length !== 1) params.set('brand', selectedBrand.trim());
     if (market !== DEFAULT_MARKET) params.set('market', market);
 
     const sortedGrades = [...selectedGrades].sort((a, b) => a.localeCompare(b));
@@ -660,7 +714,7 @@ function App() {
 
     navigate(
       {
-        pathname: decodedRouteBrand.trim() && selectedBrandValues.length === 1 ? `/brand/${encodeURIComponent(selectedBrandValues[0])}` : '/',
+        pathname: selectedBrandValues.length === 1 ? `/brand/${encodeURIComponent(selectedBrandValues[0])}` : '/',
         search: nextSearch ? `?${nextSearch}` : '',
       },
       { replace: true },
@@ -977,7 +1031,13 @@ function App() {
   const sortedCategories = useMemo(
     () => [...categories]
       .filter((entry) => entry.count > 0)
-      .sort((a, b) => a.name.localeCompare(b.name)),
+      .sort((a, b) => {
+        const labelA = formatCategoryDisplayName(a.name);
+        const labelB = formatCategoryDisplayName(b.name);
+        const byLabel = labelA.localeCompare(labelB, undefined, { sensitivity: 'base' });
+        if (byLabel !== 0) return byLabel;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      }),
     [categories],
   );
 
@@ -1056,7 +1116,7 @@ function App() {
     for (const category of selectedCategoryValues) {
       chips.push({
         key: `category-${category}`,
-        label: `Category: ${category}`,
+        label: `Category: ${formatCategoryDisplayName(category)}`,
         clear: () => {
           setSelectedCategory(joinFilterValues(selectedCategoryValues.filter((item) => item !== category)));
         },
@@ -1344,7 +1404,7 @@ function App() {
                 <div
                   ref={searchBoxRef}
                   className={`relative flex h-10 flex-1 flex-wrap items-center gap-1 rounded-lg border border-[hsl(220_14%_89%)] bg-white px-2 py-0 ${
-                    isMobileViewport ? 'order-2 basis-full min-w-0' : 'min-w-[260px]'
+                    isMobileViewport ? 'order-2 basis-full min-w-0' : 'min-w-[220px] flex-[1.1]'
                   }`}
                 >
                   <div className="flex min-w-0 flex-1 items-center">
@@ -1473,6 +1533,99 @@ function App() {
                     </div>
                   )}
                 </div>
+
+                {!isMobileViewport && !filtersOpen && (
+                  <>
+                    <div ref={quickCategoryRef} className="relative hidden lg:flex h-10 w-[210px] shrink-0 items-center rounded-lg border border-[hsl(220_14%_89%)] bg-white px-3">
+                      <input
+                        type="text"
+                        value={categorySearchTerm}
+                        onChange={(e) => setCategorySearchTerm(e.target.value)}
+                        onFocus={() => setTopQuickFilterOpen('category')}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            void commitQuickCategorySelection();
+                            setTopQuickFilterOpen(null);
+                          }
+                        }}
+                        placeholder={summarizeQuickFilterSelection('Category', selectedCategoryValues, formatCategoryDisplayName)}
+                        className="h-7 w-full border-0 bg-transparent px-0 text-xs text-[hsl(222_47%_8%)] placeholder:text-[hsl(220_12%_60%)] focus:outline-none"
+                      />
+                      {topQuickFilterOpen === 'category' && (
+                        <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-[340px] overflow-y-auto rounded-lg border border-[hsl(220_16%_84%)] bg-white py-1 shadow-[0_10px_28px_rgb(18_32_74/0.16)]">
+                          {(categorySearchTerm.trim() ? filteredCategoryOptions : availableCategoryOptions).map((item) => {
+                            const isSelected = selectedCategoryValues.includes(item.name);
+                            return (
+                              <button
+                                key={item.name}
+                                type="button"
+                                onPointerDown={(event) => {
+                                  event.preventDefault();
+                                  void commitQuickCategorySelection(item.name);
+                                  setTopQuickFilterOpen(null);
+                                }}
+                                className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left text-xs text-[hsl(222_47%_16%)] hover:bg-[hsl(220_18%_96%)]"
+                              >
+                                <span className="min-w-0 flex-1 whitespace-normal leading-snug">{formatCategoryDisplayName(item.name)}</span>
+                                <span className="flex shrink-0 items-center gap-2 pt-0.5 text-[10px] text-[hsl(220_12%_50%)]">
+                                  <span>{item.count}</span>
+                                  {isSelected && <Check className="h-3.5 w-3.5 text-[hsl(221_92%_55%)]" />}
+                                </span>
+                              </button>
+                            );
+                          })}
+                          {(categorySearchTerm.trim() ? filteredCategoryOptions : availableCategoryOptions).length === 0 && (
+                            <div className="px-3 py-2 text-xs text-[hsl(220_12%_46%)]">No matching categories</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div ref={quickBrandRef} className="relative hidden lg:flex h-10 w-[210px] shrink-0 items-center rounded-lg border border-[hsl(220_14%_89%)] bg-white px-3">
+                      <input
+                        type="text"
+                        value={brandSearchTerm}
+                        onChange={(e) => setBrandSearchTerm(e.target.value)}
+                        onFocus={() => setTopQuickFilterOpen('brand')}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            void commitQuickBrandSelection();
+                            setTopQuickFilterOpen(null);
+                          }
+                        }}
+                        placeholder={summarizeQuickFilterSelection('Brand', selectedBrandValues)}
+                        className="h-7 w-full border-0 bg-transparent px-0 text-xs text-[hsl(222_47%_8%)] placeholder:text-[hsl(220_12%_60%)] focus:outline-none"
+                      />
+                      {topQuickFilterOpen === 'brand' && (
+                        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-lg border border-[hsl(220_16%_84%)] bg-white py-1 shadow-[0_10px_28px_rgb(18_32_74/0.16)]">
+                          {(brandSearchTerm.trim() ? filteredBrandOptions : availableBrandOptions).map((brand) => {
+                            const isSelected = selectedBrandValues.includes(brand);
+                            return (
+                              <button
+                                key={brand}
+                                type="button"
+                                onPointerDown={(event) => {
+                                  event.preventDefault();
+                                  void commitQuickBrandSelection(brand);
+                                  setTopQuickFilterOpen(null);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-[hsl(222_47%_16%)] hover:bg-[hsl(220_18%_96%)]"
+                              >
+                                <span className="min-w-0 flex-1 truncate">{brand}</span>
+                                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-[hsl(221_92%_55%)]" />}
+                              </button>
+                            );
+                          })}
+                          {(brandSearchTerm.trim() ? filteredBrandOptions : availableBrandOptions).length === 0 && (
+                            <div className="px-3 py-2 text-xs text-[hsl(220_12%_46%)]">No matching brands</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 <div className={`flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-[hsl(220_12%_50%)] ${isMobileViewport ? 'order-1 ml-auto' : ''}`}>
                   {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin text-[hsl(220_16%_40%)]" /> : null}
@@ -1616,7 +1769,7 @@ function App() {
                                 setSelectedCategory(joinFilterValues([...next]));
                               }}
                             />
-                            <span className="truncate">{item.name}</span>
+                            <span className="truncate">{formatCategoryDisplayName(item.name)}</span>
                           </label>
                         );
                       })}
@@ -1648,9 +1801,6 @@ function App() {
                                 const next = new Set(selectedBrandValues);
                                 if (e.target.checked) next.add(brand); else next.delete(brand);
                                 setSelectedBrand(joinFilterValues([...next]));
-                                if (decodedRouteBrand.trim()) {
-                                  navigate('/');
-                                }
                               }}
                             />
                             <span className="truncate">{brand}</span>
@@ -1791,6 +1941,8 @@ function App() {
                           setSelectedCategory('');
                           setBrandFilter('');
                           setKeyword('');
+                            setCategorySearchTerm('');
+                            setBrandSearchTerm('');
                           setMarket(DEFAULT_MARKET);
                           setInStockOnly(true);
                           setHasPictureOnly(false);
@@ -1916,22 +2068,6 @@ function App() {
                         <span className="intro-bigmark__bar intro-bigmark__bar--3" />
                       </div>
                       <div className="relative z-10 flex h-full flex-col">
-                        <button
-                          type="button"
-                          onClick={() => setShowIntroCard(false)}
-                          className="absolute right-0 top-0 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:bg-white/20"
-                          aria-label="Close introduction"
-                          title="Close"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-
-                        <img
-                          src="/marketing/logo-ean.png"
-                          alt="EANrunner"
-                          className="h-6 w-auto self-start object-contain brightness-0 invert"
-                        />
-
                         <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9bb8ff]">Product data platform</p>
                         <p className="mt-2 text-[19px] font-bold leading-[1.06] text-white sm:text-[24px] xl:text-[26px]">
                           All supplier products,

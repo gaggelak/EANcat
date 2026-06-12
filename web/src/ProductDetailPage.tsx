@@ -16,6 +16,15 @@ const GRADE_BADGE: Record<MarginGrade, string> = {
   'N/A': 'bg-gray-100 text-gray-500 border-gray-200',
 };
 
+function formatCategoryDisplayName(value: string): string {
+  const afterChevron = value.includes('>') ? value.split('>').at(-1) ?? value : value;
+  const normalized = afterChevron.trim();
+  if (normalized.includes(' - ')) {
+    return normalized.split(' - ').at(-1)?.trim() || normalized;
+  }
+  return normalized;
+}
+
 // Estimated margin range from the public grade — mirrors App.tsx marginRangeLabel.
 function marginRangeLabel(grade: MarginGrade, marketPrice: number | null, currency: string | null): string | null {
   if (!marketPrice || marketPrice <= 0 || grade === 'N/A') return null;
@@ -192,7 +201,7 @@ export default function ProductDetailPage() {
           {product.category && (
             <div className="bg-white rounded-lg border border-[hsl(220_14%_89%)] px-3 py-2">
               <p className="text-[9px] uppercase tracking-wider text-[hsl(220_12%_55%)] font-semibold">Category</p>
-              <p className="text-xs font-medium text-[hsl(222_47%_8%)] mt-0.5">{product.category}</p>
+              <p className="text-xs font-medium text-[hsl(222_47%_8%)] mt-0.5">{formatCategoryDisplayName(product.category)}</p>
             </div>
           )}
         </div>
