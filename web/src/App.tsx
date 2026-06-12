@@ -1,6 +1,6 @@
 ﻿import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Filter, Loader2, Menu, Search, X } from 'lucide-react';
+import { ChevronDown, Filter, Loader2, Menu, Search, X } from 'lucide-react';
 import { getBrandClusters, getCategories, getProducts, getSearchSuggestions } from './api';
 import type { BrandClusterGroup, CategoryEntry, PublicProduct, SearchSuggestion } from './types';
 import SiteFooter from './SiteFooter';
@@ -266,21 +266,29 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMes
 
 function marginRangeLabel(grade: string, marketPrice: number | null, currency: string | null): string | null {
   if (!marketPrice || marketPrice <= 0 || grade === 'N/A') return null;
-  const ratesToEur: Record<string, number> = { EUR: 1, DKK: 0.134, SEK: 0.088 };
   const marketCurrency = (currency || 'EUR').toUpperCase();
-  const rate = ratesToEur[marketCurrency] ?? 1;
-  const fmt = (v: number) => new Intl.NumberFormat('en-IE', {
+  const resolvedCurrency = marketCurrency === 'DKK' || marketCurrency === 'SEK' || marketCurrency === 'EUR'
+    ? marketCurrency
+    : 'EUR';
+  const localeByCurrency: Record<string, string> = {
+    DKK: 'da-DK',
+    SEK: 'sv-SE',
+    EUR: 'fi-FI',
+  };
+  const fmt = (v: number) => new Intl.NumberFormat(localeByCurrency[resolvedCurrency], {
     style: 'currency',
-    currency: 'EUR',
+    currency: resolvedCurrency,
+    currencyDisplay: 'code',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(Math.abs(v * rate));
+  }).format(Math.abs(v));
+  const zeroLabel = fmt(0);
   switch (grade) {
     case 'A': return `More than +${fmt(marketPrice * 0.20)}`;
     case 'B': return `Between ${fmt(marketPrice * 0.10)} to ${fmt(marketPrice * 0.20)}`;
     case 'C': return `Between ${fmt(marketPrice * 0.05)} to ${fmt(marketPrice * 0.10)}`;
-    case 'D': return `Between €0.00 to ${fmt(marketPrice * 0.05)}`;
-    case 'E': return `Loss between 0 and -${fmt(marketPrice * 0.10)}`;
+    case 'D': return `Between ${zeroLabel} to ${fmt(marketPrice * 0.05)}`;
+    case 'E': return `Loss between ${zeroLabel} and -${fmt(marketPrice * 0.10)}`;
     case 'F': return `Less than -${fmt(marketPrice * 0.10)}`;
     default: return null;
   }
@@ -288,10 +296,12 @@ function marginRangeLabel(grade: string, marketPrice: number | null, currency: s
 
 const ProductCard = memo(function ProductCard({
   product,
+  market,
   compact,
   eagerImage,
 }: {
   product: PublicProduct;
+  market: string;
   compact?: boolean;
   eagerImage?: boolean;
 }) {
@@ -309,7 +319,7 @@ const ProductCard = memo(function ProductCard({
         containIntrinsicSize: compact ? '330px 180px' : '360px 220px',
       }}
     >
-      <Link to={`/product/${encodeURIComponent(product.ean)}`} className="block">
+      <Link to={`/product/${encodeURIComponent(product.ean)}?market=${encodeURIComponent(market)}`} className="block">
         <div className={`aspect-square bg-white overflow-hidden relative ${compact ? 'max-h-[180px]' : ''}`}>
           <img
             src={product.image || PLACEHOLDER_IMAGE}
@@ -347,7 +357,7 @@ const ProductCard = memo(function ProductCard({
         </div>
       </Link>
       <div className={`${compact ? 'p-2.5 gap-1.5' : 'p-3 gap-2'} flex flex-col flex-1`}>
-        <Link to={`/product/${encodeURIComponent(product.ean)}`} className="block min-w-0 hover:underline decoration-[hsl(221_92%_55%)] underline-offset-2">
+        <Link to={`/product/${encodeURIComponent(product.ean)}?market=${encodeURIComponent(market)}`} className="block min-w-0 hover:underline decoration-[hsl(221_92%_55%)] underline-offset-2">
           <p className={`${compact ? 'text-[9px]' : 'text-[10px]'} text-[hsl(220_12%_50%)] font-medium truncate`}>{product.brand || '—'}</p>
           <h3 className={`${compact ? 'text-[11px] min-h-[2rem]' : 'text-xs min-h-[2.25rem]'} font-semibold text-[hsl(222_47%_8%)] line-clamp-2 leading-snug mt-0.5`}>{product.title}</h3>
         </Link>
@@ -946,9 +956,18 @@ function App() {
         if (aHasImage !== bHasImage) return bHasImage - aHasImage;
       }
 
-      const aNa = a.marginGrade === 'N/A' ? 1 : 0;
-      const bNa = b.marginGrade === 'N/A' ? 1 : 0;
-      return aNa - bNa;
+      const gradePriority = (grade: string): number => {
+        if (grade === 'F') return 3;
+        if (grade === 'E') return 2;
+        if (grade === 'N/A') return 1;
+        return 0;
+      };
+
+      const aPriority = gradePriority(a.marginGrade);
+      const bPriority = gradePriority(b.marginGrade);
+      if (aPriority !== bPriority) return aPriority - bPriority;
+
+      return (b.competitorCount ?? 0) - (a.competitorCount ?? 0);
       })
         .slice(0, (isCompactVersion && decodedRouteBrand.trim()) ? brandVisibleLimit : listVisibleLimit);
       }, [products, selectedCompetitionLevels, debouncedKeyword, isCompactVersion, decodedRouteBrand, selectedBrandValues, brandVisibleLimit, listVisibleLimit]);
@@ -1046,9 +1065,6 @@ function App() {
     if (keyword.trim()) {
       chips.push({ key: 'search', label: `Search: ${keyword.trim()}`, clear: () => setKeyword('') });
     }
-    if (market !== DEFAULT_MARKET) {
-      chips.push({ key: 'market', label: `Market: ${market.toUpperCase()}`, clear: () => setMarket(DEFAULT_MARKET) });
-    }
     const isDefaultFrontPageState = isCompactVersion
       && !decodedRouteBrand.trim()
       && inStockOnly
@@ -1111,6 +1127,16 @@ function App() {
   const isSearchLoading = loading && debouncedKeyword.trim().length > 0;
   const shouldShowGridSkeletons = loading && !shouldClusterByBrand && visibleProducts.length === 0;
   const skeletonCount = isMobileViewport ? 6 : 12;
+  const hasActiveResultFilters = Boolean(
+    debouncedKeyword.trim()
+      || selectedCategoryValues.length > 0
+      || selectedBrandValues.length > 0
+      || selectedCompetitionLevels.size > 0
+      || selectedGrades.size > 0
+      || hasPictureOnly
+      || market !== DEFAULT_MARKET
+      || (!isCompactVersion && inStockOnly),
+  );
 
   useEffect(() => {
     const inputFocused = typeof document !== 'undefined' && document.activeElement === searchInputRef.current;
@@ -1317,7 +1343,7 @@ function App() {
 
                 <div
                   ref={searchBoxRef}
-                  className={`relative flex min-h-9 flex-1 flex-wrap items-center gap-1 rounded-lg border border-[hsl(220_14%_89%)] bg-white px-2 py-1 ${
+                  className={`relative flex h-10 flex-1 flex-wrap items-center gap-1 rounded-lg border border-[hsl(220_14%_89%)] bg-white px-2 py-0 ${
                     isMobileViewport ? 'order-2 basis-full min-w-0' : 'min-w-[260px]'
                   }`}
                 >
@@ -1369,24 +1395,24 @@ function App() {
                   <button
                     type="button"
                     onClick={() => setFiltersOpen((v) => !v)}
-                    className={`inline-flex h-7 shrink-0 items-center rounded-md border px-2 text-[11px] font-semibold transition-colors ${
+                    className={`inline-flex h-9 shrink-0 items-center rounded-lg border px-2.5 text-[11px] font-medium transition-colors ${
                       filtersOpen
                         ? 'border-[hsl(221_72%_72%)] bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
                         : 'border-[hsl(220_16%_84%)] bg-white text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]'
                     }`}
                   >
-                    <Filter className="mr-1 h-3 w-3" />
+                    <Filter className="mr-1 h-3.5 w-3.5" />
                     Filters
                   </button>
                   {!isMobileViewport && (
-                    <div className="inline-flex h-7 shrink-0 items-center overflow-hidden rounded-md border border-[hsl(220_16%_84%)] bg-white">
+                    <div className="inline-flex h-9 shrink-0 items-center overflow-hidden rounded-lg border border-[hsl(220_16%_84%)] bg-white">
                       <button
                         type="button"
                         onClick={() => setViewMode('grid')}
-                        className={`h-full px-2 text-[10px] font-semibold ${
+                        className={`h-full px-2.5 text-[11px] font-medium ${
                           viewMode === 'grid'
                             ? 'bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
-                            : 'text-[hsl(220_12%_45%)] hover:bg-[hsl(220_18%_95%)]'
+                            : 'text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]'
                         }`}
                       >
                         Pictures
@@ -1394,10 +1420,10 @@ function App() {
                       <button
                         type="button"
                         onClick={() => setViewMode('list')}
-                        className={`h-full border-l border-[hsl(220_16%_84%)] px-2 text-[10px] font-semibold ${
+                        className={`h-full border-l border-[hsl(220_16%_84%)] px-2.5 text-[11px] font-medium ${
                           viewMode === 'list'
                             ? 'bg-[hsl(221_84%_95%)] text-[hsl(221_72%_32%)]'
-                            : 'text-[hsl(220_12%_45%)] hover:bg-[hsl(220_18%_95%)]'
+                            : 'text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]'
                         }`}
                       >
                         List
@@ -1405,7 +1431,7 @@ function App() {
                     </div>
                   )}
                   {loading ? (
-                    <span className="inline-flex h-7 shrink-0 items-center rounded-md border border-[hsl(221_72%_72%)] bg-[hsl(221_84%_95%)] px-2 text-[10px] font-semibold text-[hsl(221_72%_32%)]">
+                    <span className="inline-flex h-9 shrink-0 items-center rounded-lg border border-[hsl(221_72%_72%)] bg-[hsl(221_84%_95%)] px-2.5 text-[11px] font-medium text-[hsl(221_72%_32%)]">
                       {isSearchLoading ? 'Searching products...' : 'Loading catalog...'}
                     </span>
                   ) : null}
@@ -1451,20 +1477,28 @@ function App() {
                 <div className={`flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-[hsl(220_12%_50%)] ${isMobileViewport ? 'order-1 ml-auto' : ''}`}>
                   {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin text-[hsl(220_16%_40%)]" /> : null}
                   {!isMobileViewport && (
-                    <a
-                      href="https://app.eanrunner.com/"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex h-9 items-center rounded-lg border border-[hsl(220_16%_84%)] bg-white px-3 text-xs font-semibold text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
-                    >
-                      Login
-                    </a>
+                    <label className="inline-flex h-10 items-center rounded-lg border border-[hsl(220_16%_84%)] bg-white pl-2.5 pr-1.5 text-[11px] font-medium text-[hsl(222_47%_20%)]">
+                      <span className="mr-1 text-[11px] leading-[1] text-[hsl(222_47%_20%)]">Market</span>
+                      <span className="relative inline-flex items-center">
+                        <select
+                          value={market}
+                          onChange={(e) => setMarket(e.target.value)}
+                          className="h-8 w-[84px] appearance-none border-0 bg-transparent pl-1 pr-4 text-[11px] font-medium leading-5 text-[hsl(222_47%_20%)] focus:outline-none"
+                          aria-label="Select market"
+                        >
+                          <option value="dk">DK (DKK)</option>
+                          <option value="se">SE (SEK)</option>
+                          <option value="fi">FI (EUR)</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-0.5 h-3.5 w-3.5 text-[hsl(220_12%_50%)]" />
+                      </span>
+                    </label>
                   )}
                   <div className="relative" ref={menuRef}>
                     <button
                       type="button"
                       onClick={() => setMenuOpen((v) => !v)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[hsl(220_16%_84%)] bg-white text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[hsl(220_16%_84%)] bg-white text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
                       aria-label="Open menu"
                       title="Menu"
                     >
@@ -1474,20 +1508,18 @@ function App() {
                     {menuOpen && (
                       <div className="absolute right-0 top-11 z-50 w-[296px] rounded-xl border border-[hsl(220_16%_84%)] bg-white p-4 shadow-[0_12px_30px_rgb(18_32_74/0.18)]">
                         <div className="space-y-4 text-[13px] text-[hsl(222_47%_18%)]">
-                          {isMobileViewport && (
-                            <section>
-                              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Account</p>
-                              <a
-                                href="https://app.eanrunner.com/"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-[hsl(220_18%_98%)] px-2.5 py-1 text-[12px] font-semibold text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
-                                onClick={() => setMenuOpen(false)}
-                              >
-                                Login
-                              </a>
-                            </section>
-                          )}
+                          <section>
+                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Account</p>
+                            <a
+                              href="https://app.eanrunner.com/"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center rounded-md border border-[hsl(220_16%_84%)] bg-[hsl(220_18%_98%)] px-2.5 py-1 text-[12px] font-semibold text-[hsl(222_47%_20%)] hover:bg-[hsl(220_18%_95%)]"
+                              onClick={() => setMenuOpen(false)}
+                            >
+                              Login
+                            </a>
+                          </section>
                           <section>
                             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Explore</p>
                             <div className="flex flex-col gap-1 text-[13px] leading-6">
@@ -1784,7 +1816,7 @@ function App() {
 
             {shouldClusterByBrand ? (
               <div className="space-y-4">
-                {!loading && brandGroups.length === 0 && !error && (
+                {!loading && brandGroups.length === 0 && !error && hasActiveResultFilters && (
                   <div className="flex flex-col items-center justify-center py-20 text-center">
                     <Search className="w-10 h-10 text-[hsl(220_12%_70%)] mb-3" />
                     <p className="text-sm font-medium text-[hsl(222_47%_8%)]">No products found</p>
@@ -1968,6 +2000,7 @@ function App() {
                           <div key={product.ean} className="flex w-[156px] shrink-0 snap-start [&>div]:h-full [&>div]:w-full">
                             <ProductCard
                               product={product}
+                              market={market}
                               compact
                               eagerImage={groupIndex === 0 && index < ABOVE_THE_FOLD_PRIORITY_COUNT}
                             />
@@ -1998,6 +2031,7 @@ function App() {
                           <ProductCard
                             key={product.ean}
                             product={product}
+                            market={market}
                             compact
                             eagerImage={groupIndex === 0 && index < ABOVE_THE_FOLD_PRIORITY_COUNT}
                           />
@@ -2051,7 +2085,7 @@ function App() {
               </div>
             ) : (
               <>
-                {!loading && visibleProducts.length === 0 && !error && (
+                {!loading && visibleProducts.length === 0 && !error && hasActiveResultFilters && (
                   <div className="flex flex-col items-center justify-center py-20 text-center">
                     <Search className="w-10 h-10 text-[hsl(220_12%_70%)] mb-3" />
                     <p className="text-sm font-medium text-[hsl(222_47%_8%)]">No products found</p>
@@ -2071,6 +2105,7 @@ function App() {
                         <ProductCard
                           key={product.ean}
                           product={product}
+                          market={market}
                           compact
                           eagerImage={index < ABOVE_THE_FOLD_PRIORITY_COUNT}
                         />
@@ -2099,7 +2134,7 @@ function App() {
                               <td className="px-3 py-2 font-mono text-[11px]">{product.ean}</td>
                               <td className="px-3 py-2">{product.brand || '—'}</td>
                               <td className="max-w-[520px] px-3 py-2">
-                                <Link to={`/product/${encodeURIComponent(product.ean)}`} className="line-clamp-1 hover:underline">
+                                <Link to={`/product/${encodeURIComponent(product.ean)}?market=${encodeURIComponent(market)}`} className="line-clamp-1 hover:underline">
                                   {product.title}
                                 </Link>
                               </td>
@@ -2130,11 +2165,11 @@ function App() {
                     {loading ? 'Loading…' : `Load ${LIST_LOAD_MORE_BATCH_SIZE} more`}
                   </button>
                 )}
-                <span className="text-xs text-[hsl(220_12%_45%)]">
-                  {loading
-                    ? 'Loading...'
-                    : `Showing ${visibleProducts.length.toLocaleString()} of ${totalProducts.toLocaleString()} products`}
-                </span>
+                {!loading && (
+                  <span className="text-xs text-[hsl(220_12%_45%)]">
+                    {`Showing ${visibleProducts.length.toLocaleString()} of ${totalProducts.toLocaleString()} products`}
+                  </span>
+                )}
               </div>
             )}
 

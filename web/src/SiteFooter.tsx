@@ -72,7 +72,7 @@ export default function SiteFooter({ className = 'mt-10' }: SiteFooterProps) {
                   WooCommerce
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-md border border-[hsl(220_16%_84%)] bg-white px-2.5 py-1.5 text-[11px] font-medium text-[hsl(222_47%_18%)]">
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-[4px] bg-[hsl(221_92%_55%)] text-[9px] font-bold text-white">QB</span>
+                  <img src="/marketing/logos/quickbutik.svg" alt="Quickbutik" className="h-4 w-4 object-contain" />
                   Quickbutik
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-md border border-[hsl(220_16%_84%)] bg-white px-2.5 py-1.5 text-[11px] font-medium text-[hsl(222_47%_18%)]">

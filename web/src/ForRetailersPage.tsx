@@ -8,7 +8,7 @@ const LOGOS = [
   { kind: 'image' as const, src: '/marketing/logos/magento.png', alt: 'Magento logo' },
   { kind: 'image' as const, src: '/marketing/logos/shopify.png', alt: 'Shopify logo' },
   { kind: 'image' as const, src: '/marketing/logos/woocommerce.png', alt: 'WooCommerce logo' },
-  { kind: 'badge' as const, label: 'Quickbutik' },
+  { kind: 'iconText' as const, src: '/marketing/logos/quickbutik.svg', alt: 'Quickbutik logo', label: 'Quickbutik' },
   { kind: 'iconText' as const, src: 'https://cdn.simpleicons.org/googlebigquery/669DF6', alt: 'BigQuery logo', label: 'BigQuery' },
 ];
 
@@ -95,12 +95,6 @@ export default function ForRetailersPage() {
               <div key={logo.kind === 'image' ? logo.alt : logo.label} className="flex h-12 items-center justify-center">
                 {logo.kind === 'image' && (
                   <img src={logo.src} alt={logo.alt} className="max-h-8 w-auto object-contain opacity-90" />
-                )}
-                {logo.kind === 'badge' && (
-                  <span className="inline-flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em] text-[hsl(222_47%_20%)] sm:text-[17px]">
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-[5px] bg-[hsl(221_92%_55%)] text-[9px] font-bold text-white">QB</span>
-                    {logo.label}
-                  </span>
                 )}
                 {logo.kind === 'iconText' && (
                   <span className="inline-flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em] text-[hsl(222_47%_20%)] sm:text-[17px]">

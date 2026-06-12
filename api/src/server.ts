@@ -610,8 +610,18 @@ async function main(): Promise<void> {
         WITH ${filteredCte(countWhere)},
         graded AS ( SELECT * FROM filtered_products ${gradeWhereClause} ),
         preview AS ( SELECT * FROM graded ${previewWhereSql} ),
+        quality_brand_counts AS (
+          SELECT brand, COUNT(*) AS quality_product_count
+          FROM preview
+          WHERE has_image = 1 AND margin_grade IN ('A', 'B', 'C', 'D')
+          GROUP BY brand
+        ),
         eligible_brands AS (
-          SELECT brand FROM preview GROUP BY brand HAVING COUNT(*) >= @minBrandProducts
+          SELECT p.brand
+          FROM preview p
+          INNER JOIN quality_brand_counts qbc ON qbc.brand = p.brand
+          GROUP BY p.brand, qbc.quality_product_count
+          HAVING COUNT(*) >= @minBrandProducts AND qbc.quality_product_count >= @minBrandProducts
         )
         SELECT COUNT(*) AS totalProducts, COUNT(DISTINCT p.brand) AS totalBrands
         FROM preview p INNER JOIN eligible_brands eb ON eb.brand = p.brand
@@ -635,9 +645,21 @@ async function main(): Promise<void> {
           GROUP BY brand
         ),
         preview AS ( SELECT * FROM graded ${previewWhereSql} ),
+        quality_brand_counts AS (
+          SELECT brand, COUNT(*) AS quality_product_count
+          FROM preview
+          WHERE has_image = 1 AND margin_grade IN ('A', 'B', 'C', 'D')
+          GROUP BY brand
+        ),
         ranked AS (
           SELECT p.*,
-            ROW_NUMBER() OVER (PARTITION BY p.brand ORDER BY p.updated_at DESC, p.ean ASC) AS brand_item_rank,
+            ROW_NUMBER() OVER (
+              PARTITION BY p.brand
+              ORDER BY
+                CASE WHEN p.margin_grade IN ('E', 'F') THEN 1 ELSE 0 END ASC,
+                p.updated_at DESC,
+                p.ean ASC
+            ) AS brand_item_rank,
             MAX(p.updated_at) OVER (PARTITION BY p.brand) AS brand_latest_added,
             COUNT(*) OVER (PARTITION BY p.brand) AS brand_preview_count
           FROM preview p
@@ -646,7 +668,9 @@ async function main(): Promise<void> {
           SELECT DISTINCT r.brand, r.brand_latest_added, r.brand_preview_count,
             DENSE_RANK() OVER (ORDER BY r.brand_latest_added DESC, r.brand ASC) AS brand_rank
           FROM ranked r
+          INNER JOIN quality_brand_counts qbc ON qbc.brand = r.brand
           WHERE r.brand_preview_count >= @minBrandProducts
+            AND qbc.quality_product_count >= @minBrandProducts
         ),
         selected_brands AS (
           SELECT rb.brand, rb.brand_latest_added, bt.brand_total_count
