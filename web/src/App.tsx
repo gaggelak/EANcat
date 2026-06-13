@@ -471,6 +471,7 @@ function App() {
   const [brandClusterGroups, setBrandClusterGroups] = useState<BrandClusterGroup[]>([]);
   const [brandClusterOffset, setBrandClusterOffset] = useState(0);
   const [brandClusterTotalBrands, setBrandClusterTotalBrands] = useState(0);
+  const [homeRefreshTick, setHomeRefreshTick] = useState(0);
   const [disableBrandClusters, setDisableBrandClusters] = useState(false);
   const [showIntroCard, setShowIntroCard] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -565,8 +566,13 @@ function App() {
     setPage(1);
     setBrandVisibleLimit(BRAND_PAGE_INITIAL_BATCH_SIZE);
     setBrandClusterOffset(0);
+    setBrandClusterGroups([]);
+    setBrandClusterTotalBrands(0);
+    setProducts([]);
     setShowIntroCard(true);
     setFiltersOpen(false);
+    // Force a fresh home-catalog load even when the user is already on default state.
+    setHomeRefreshTick((tick) => tick + 1);
   };
 
   const commitQuickCategorySelection = (rawValue?: string) => {
@@ -970,6 +976,7 @@ function App() {
     pageSize,
     compactBrandPreviewCount,
     brandClusterPerBrandLimit,
+    homeRefreshTick,
   ]);
 
   // Reset to page 1 when filters change
@@ -2179,7 +2186,7 @@ function App() {
                   );
                 })}
 
-                {brandGroups.length < brandClusterTotalBrands && (
+                {brandGroups.length > 0 && brandGroups.length < brandClusterTotalBrands && (
                   <div className="space-y-2 pt-1 pb-2">
                     <div className="flex items-center justify-center gap-3">
                       <button
