@@ -796,7 +796,7 @@ function App() {
         });
         const cached = loadHomeCatalogCache(shouldClusterByBrand ? clusterCacheKey : productCacheKey);
         const shouldUseCached = cached
-          && (cached.mode !== 'clusters' || cached.brandClusterGroups.length > 0 || cached.totalBrands === 0);
+          && (cached.mode !== 'clusters' || cached.brandClusterGroups.length > 0);
 
         if (shouldUseCached) {
           setError('');
@@ -844,8 +844,11 @@ function App() {
             );
 
             if (!active) return;
-            if (brandClusterOffset === 0 && clusterData.totalBrands > 0 && clusterData.brands.length === 0) {
+            if (brandClusterOffset === 0 && clusterData.brands.length === 0 && clusterData.totalProducts > 0) {
               throw new Error('Empty cluster payload for non-empty catalog');
+            }
+            if (brandClusterOffset === 0 && canUseHomeCatalogCache && clusterData.brands.length === 0) {
+              throw new Error('Empty cluster payload for front page');
             }
             setDisableBrandClusters(false);
             setBrandClusterGroups((prev) => (brandClusterOffset === 0 ? clusterData.brands : [...prev, ...clusterData.brands]));
