@@ -53,8 +53,8 @@ export default function PricingPage() {
 
             <article className="flex h-full flex-col rounded-lg border border-[hsl(220_14%_89%)] bg-[hsl(220_20%_98%)] p-6 pb-4">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_42%)]">For retailers</p>
-              <p className="mt-3 text-[40px] font-black leading-none text-[hsl(221_92%_44%)]">Free*</p>
-              <p className="mt-4 text-sm text-[hsl(220_12%_28%)]">Supplier-network products cost €0 for retailers.</p>
+              <p className="mt-3 text-[40px] font-black leading-none text-[hsl(221_92%_44%)]">€0,1</p>
+              <p className="mt-4 text-sm text-[hsl(220_12%_28%)]">Supplier-network products cost €0,1 per updated product for retailers.</p>
               <ul className="mt-4 space-y-1.5 text-sm leading-7 text-[hsl(220_12%_30%)]">
                 <li>• Supplier pays when sales are created</li>
                 <li>• Price robot included</li>
@@ -71,9 +71,7 @@ export default function PricingPage() {
             </article>
           </div>
 
-          <p className="mt-3 text-[12px] leading-5 text-[hsl(220_12%_40%)] lg:text-right">
-            *Fair use applies for very large catalogues.
-          </p>
+          <p className="mt-3 text-[12px] leading-5 text-[hsl(220_12%_40%)] lg:text-right">Fair use applies for very large catalogues.</p>
         </section>
 
         <SiteFooter className="mt-10" />

@@ -40,8 +40,8 @@ export default function RetailerOwnSuppliersPage() {
 
           <div className="mt-7 rounded-2xl border border-[hsl(220_16%_88%)] bg-[hsl(220_22%_99%)] p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[hsl(220_12%_42%)]">Products from your own suppliers</p>
-            <p className="mt-4 text-[40px] font-black leading-none text-[hsl(221_92%_44%)]">€0.10</p>
-            <p className="mt-1 text-base font-semibold text-[hsl(222_47%_16%)]">per active product/month</p>
+            <p className="mt-4 text-[40px] font-black leading-none text-[hsl(221_92%_44%)]">€0,1</p>
+            <p className="mt-1 text-base font-semibold text-[hsl(222_47%_16%)]">per updated product</p>
             <p className="mt-4 text-base font-semibold text-[hsl(222_47%_15%)]">Minimum €299/month</p>
 
             <ul className="mt-5 list-disc space-y-1.5 pl-5 text-sm leading-7 text-[hsl(220_12%_30%)]">

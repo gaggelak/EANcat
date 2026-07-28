@@ -15,8 +15,8 @@ const includedFeatures = [
 
 export default function RetailerPricingPage() {
   useDocumentMeta({
-    title: 'Retailer Pricing: From 0 EUR',
-    description: 'Retailer pricing from EANrunner with free access tiers, hourly stock updates, price automation, and optional scaling for large catalogs.',
+    title: 'Retailer Pricing: €0,1 per updated product',
+    description: 'Retailer pricing from EANrunner with per-product update pricing, hourly stock updates, and price automation.',
     path: '/pricing/retailers',
   });
 
@@ -41,25 +41,25 @@ export default function RetailerPricingPage() {
         <section className="mt-6 px-1 py-2 md:px-0 md:py-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(220_12%_46%)]">Retailer pricing</p>
           <h1 className="mt-2 text-3xl font-bold leading-tight text-[hsl(222_47%_10%)] md:text-4xl">
-            Free access to supplier products
+            Pay per updated supplier product
           </h1>
           <p className="mt-4 max-w-3xl text-base leading-7 text-[hsl(220_12%_32%)]">
-            Start selling products from the EANrunner supplier network for free.
+            Retailers pay €0,1 for each supplier-network product update.
           </p>
           <p className="mt-2 max-w-3xl text-sm leading-7 text-[hsl(220_12%_32%)]">
-            When EANrunner receives commission from the supplier, retailers can use the products for free within fair use.
+            This keeps pricing simple and directly tied to update volume.
           </p>
 
           <div className="mt-8 border-t border-[hsl(220_16%_90%)] pt-6">
             <h2 className="text-2xl font-bold leading-tight text-[hsl(222_47%_10%)]">Products from our supplier network</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div>
-                <p className="text-[34px] font-black leading-none text-[hsl(221_92%_44%)]">€0</p>
-                <p className="mt-1 text-sm text-[hsl(220_12%_34%)]">for the first 10,000 active products</p>
+                <p className="text-[34px] font-black leading-none text-[hsl(221_92%_44%)]">€0,1</p>
+                <p className="mt-1 text-sm text-[hsl(220_12%_34%)]">per updated product</p>
               </div>
               <div className="sm:col-span-2">
-                <p className="text-sm font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">After that</p>
-                <p className="mt-1 text-base font-semibold text-[hsl(222_47%_15%)]">€0.10 per extra active product/month</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.08em] text-[hsl(220_12%_46%)]">Billing model</p>
+                <p className="mt-1 text-base font-semibold text-[hsl(222_47%_15%)]">Charged for each supplier-network product update.</p>
               </div>
             </div>
 
@@ -73,7 +73,7 @@ export default function RetailerPricingPage() {
               <li>Supplier feed handling</li>
             </ul>
 
-            <p className="mt-5 text-sm leading-7 text-[hsl(220_12%_32%)]">You only pay extra if you want to manage a very large product catalogue.</p>
+            <p className="mt-5 text-sm leading-7 text-[hsl(220_12%_32%)]">You only pay when products are updated.</p>
           </div>
 
           <button
