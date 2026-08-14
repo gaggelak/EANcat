@@ -80,7 +80,7 @@ export function useDocumentMeta(options: DocumentMetaOptions): void {
       : options.path || '/';
     const image = options.image
       ? (options.image.startsWith('http') ? options.image : `${origin}${options.image}`)
-      : `${origin}/marketing/share-card.svg`;
+      : `${origin}/marketing/share-card.png`;
     const title = buildTitle(options.title, options.path);
     const description = options.description?.trim() || DEFAULT_DESCRIPTION;
 
