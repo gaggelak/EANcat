@@ -21,8 +21,12 @@ const RAW_API_BASE = import.meta.env.DEV
   : PROD_API_BASE;
 const API_BASE = /^https?:\/\//i.test(RAW_API_BASE) ? RAW_API_BASE : `https://${RAW_API_BASE}`;
 
+function apiUrl(path: string): string {
+  return `${API_BASE}${path}`;
+}
+
 async function readJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`);
+  const response = await fetch(apiUrl(path));
   const payload = await response.json().catch(() => ({})) as { error?: string };
   if (!response.ok) {
     throw new Error(payload.error || `Request failed (${response.status})`);
@@ -33,7 +37,7 @@ async function readJson<T>(path: string): Promise<T> {
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await fetch(apiUrl(path), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
