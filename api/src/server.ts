@@ -192,6 +192,15 @@ const opportunityScanPageSchema = z.object({
   offset: z.coerce.number().int().min(0).max(MAX_STORED_OPPORTUNITIES).default(0),
 });
 
+const legacyOpportunityScanResultSchema = z.object({
+  scanId: z.string().uuid(),
+});
+
+const legacyOpportunityScanPageSchema = z.object({
+  scanId: z.string().uuid(),
+  offset: z.coerce.number().int().min(0).max(MAX_STORED_OPPORTUNITIES).default(0),
+});
+
 const supplierConnectionSchema = z.object({
   scanId: z.string().uuid(),
   shopUrl: z.string().trim().min(1).max(2048),
@@ -1202,6 +1211,54 @@ async function main(): Promise<void> {
     }
 
     const stored = findScan(req.params.scanId);
+    if (!stored) {
+      res.status(404).json({ code: 'SCAN_EXPIRED', error: 'This scan has expired. Please scan the webshop again.' });
+      return;
+    }
+
+    const opportunities = stored.opportunities.slice(parsed.data.offset, parsed.data.offset + OPPORTUNITY_PAGE_SIZE);
+    res.json({
+      opportunities,
+      hasMore: parsed.data.offset + opportunities.length < stored.opportunities.length,
+    });
+  });
+
+  // ── Legacy compatibility endpoints (old frontend bundle contract) ────────────
+  app.post('/api/public/opportunity-scan-result', (req, res) => {
+    const parsed = legacyOpportunityScanResultSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ code: 'INVALID_REQUEST', error: 'The scan reference is invalid.' });
+      return;
+    }
+
+    const stored = findScan(parsed.data.scanId);
+    if (!stored) {
+      res.status(404).json({ code: 'SCAN_EXPIRED', error: 'This shared scan has expired. Please scan the webshop again.' });
+      return;
+    }
+
+    const initialOpportunities = stored.opportunities.slice(0, OPPORTUNITY_PAGE_SIZE);
+    res.json({
+      scanId: stored.id,
+      shop: { url: stored.url, domain: stored.domain },
+      market: { code: stored.market.toUpperCase(), confidence: stored.marketConfidence },
+      detectedCategories: stored.categoryMatches,
+      detectedBrands: stored.brands,
+      detectedEanCount: stored.eans.length,
+      coverage: { pagesScanned: stored.pagesScanned, isPartial: stored.warnings.length > 0, warnings: stored.warnings },
+      opportunities: initialOpportunities,
+      hasMore: stored.opportunities.length > initialOpportunities.length,
+    });
+  });
+
+  app.post('/api/public/opportunity-scan-page', (req, res) => {
+    const parsed = legacyOpportunityScanPageSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ code: 'INVALID_REQUEST', error: 'The results page is invalid.' });
+      return;
+    }
+
+    const stored = findScan(parsed.data.scanId);
     if (!stored) {
       res.status(404).json({ code: 'SCAN_EXPIRED', error: 'This scan has expired. Please scan the webshop again.' });
       return;

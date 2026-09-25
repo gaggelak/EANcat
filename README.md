@@ -53,6 +53,8 @@ The public catalog shows, per market (DK/SE/FI):
 - `POST /api/public/opportunity-scan`
 - `GET /api/public/opportunity-scan/:scanId/result`
 - `GET /api/public/opportunity-scan/:scanId?offset=`
+- `POST /api/public/opportunity-scan-result` (legacy compatibility)
+- `POST /api/public/opportunity-scan-page` (legacy compatibility)
 - `POST /api/public/supplier-connection`
 
 ## Opportunity Finder
