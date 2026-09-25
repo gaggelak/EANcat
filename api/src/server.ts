@@ -1128,6 +1128,17 @@ async function main(): Promise<void> {
         );
         if (!hadInitialPage) categoryMatches.push(categoryMatch);
       }
+
+      if (opportunities.length < OPPORTUNITY_PAGE_SIZE) {
+        const fallbackOpportunities = rankOpportunities(await loadCandidates([]), signals, categoryMatches);
+        opportunities = combineCategoryOpportunities(
+          opportunities,
+          fallbackOpportunities,
+          OPPORTUNITY_PAGE_SIZE,
+          MAX_STORED_OPPORTUNITIES,
+        );
+      }
+
       opportunities = diversifyOpportunities(opportunities, MAX_STORED_OPPORTUNITIES);
       const stored = storeScan(signals, opportunities, categoryMatches);
       const initialOpportunities = opportunities.slice(0, OPPORTUNITY_PAGE_SIZE);
